@@ -171,8 +171,7 @@ class ParkingEnv(AbstractEnv, GoalEnv):
             network=net,
             np_random=self.np_random,
             record_history=self.config["show_trajectories"],
-        )
-
+        ) 
     def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
         empty_spots = list(self.road.network.lanes_dict().keys())

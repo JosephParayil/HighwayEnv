@@ -1,0 +1,102 @@
+from highway_env.road.lane import PolyLane, PolyLaneFixedWidth
+from highway_env.road.road import RoadNetwork, Road, LineType
+from highway_env.road.graphics import RoadGraphics, WorldSurface
+
+import pygame
+import os
+
+import random
+import math
+import numpy as np
+
+
+
+# # Main generation algorithm # #
+agent_pos = np.array([0.0,0.0])
+agent_orientation = 0
+agent_angular_vel = 0
+
+agent_speed = 1
+agent_turn_constant = 0.1
+agent_turn_friction = 0.9
+
+agent_steps = 500
+
+lane_points = []
+for i in range(agent_steps):
+    lane_points.append(tuple(agent_pos.tolist()))
+    agent_pos[0] += math.cos(agent_orientation)*agent_speed
+    agent_pos[1] += math.sin(agent_orientation)*agent_speed
+
+    agent_angular_vel += agent_turn_constant*(random.random()-0.5)
+    agent_angular_vel *= agent_turn_friction 
+    agent_orientation += agent_angular_vel
+
+
+#print(lane_points)
+
+# # Creating HighwayEnv objects # #
+
+# Lanes, RoadNetwork, Road
+
+myRoadNetwork = RoadNetwork()
+
+myLane = PolyLaneFixedWidth(
+    lane_points = lane_points,
+    line_types = (LineType.CONTINUOUS, LineType.CONTINUOUS)
+)
+
+
+myRoadNetwork.add_lane("LLC", "Hideaway", myLane)
+
+myRoad = Road(myRoadNetwork)
+
+# Highway-env Graphic items
+WIDTH, HEIGHT = 800, 600
+panel_size = (WIDTH, HEIGHT)
+sim_surface = WorldSurface(panel_size, 0, pygame.Surface(panel_size))
+
+position = np.array([0, 0])
+
+# # Pygame Initialization and Main game loop # #
+
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Highway-env")
+
+clock = pygame.time.Clock()
+FPS = 20
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # Linker input
+    keys = pygame.key.get_pressed()
+    
+    speed = 5
+    if keys[pygame.K_w]:
+        position[1] -= speed  # Move Up (y decreases in Pygame)
+    if keys[pygame.K_s]:
+        position[1] += speed  # Move Down
+    if keys[pygame.K_a]:
+        position[0] -= speed  # Move Left
+    if keys[pygame.K_d]:
+        position[0] += speed  # Move Right
+
+    # Display
+
+    sim_surface.move_display_window_to(position)
+    RoadGraphics.display(myRoad, sim_surface)
+    RoadGraphics.display_road_objects(
+            myRoad, sim_surface, offscreen = False,
+    )
+    screen.blit(sim_surface, (0, 0))
+    pygame.display.flip()
+    clock.tick(FPS)
+
+pygame.quit()
+
+
+

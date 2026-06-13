@@ -33,5 +33,5 @@ __all__ = [
     "RacetrackEnv",
     "RoundaboutEnv",
     "TwoWayEnv",
-    "UTurnEnv",
+    "UTurnEnv"
 ]

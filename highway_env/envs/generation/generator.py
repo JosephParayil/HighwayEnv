@@ -17,12 +17,14 @@ def tupleDist(tupleA, tupleB):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 
-def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, prevent_replication_radius, age_of_maturity):
-                    #forward_speed, jitteriness, max_turn_speed,
-                    #replication_chance, spontaneous_death_chance,
-                    #merge_radius, prevent_replication_radius, age_of_maturity):
-    class PerlinVariation:
-        params = {
+
+def default_params():
+    return {
+        "target_num_endpoints": 50,
+        "forward_speed": 10,
+        "age_of_maturity": 4,
+        "lane_width": 10,
+        "perlin_variation_params": {
             "jitteriness": {
                 "x": random.randint(0,10000),
                 "y": random.randint(0,10000),
@@ -32,13 +34,13 @@ def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, preven
             "max_turn_speed": {
                 "x": random.randint(0,10000),
                 "y": random.randint(0,10000),
-                "upper": 3.0,
+                "upper": 4.0,
                 "lower": 0.01
             },
             "replication_chance": {
                 "x": random.randint(0,10000),
                 "y": random.randint(0,10000),
-                "upper": 0.4,
+                "upper": 0.7,
                 "lower": 0.0
             },
             "spontaneous_death_chance": {
@@ -48,18 +50,57 @@ def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, preven
                 "lower": 0.0
             }
         }
+    }
 
+
+def generate_random_lanes(params = None):
+    if params is None:
+        params = default_params()
+
+    
+    merge_radius = params['forward_speed'] * 2
+    prevent_replication_radius = params['age_of_maturity'] * params['forward_speed']
+
+    twist_iterations = 2*params['forward_speed']
+    twist_step = 0.0002/params['forward_speed']
+    
+    lanes = generate_rough_map(
+        target_num_endpoints = params['target_num_endpoints'],
+        forward_speed = params['forward_speed'],
+        merge_radius = merge_radius,
+        prevent_replication_radius=prevent_replication_radius,
+        age_of_maturity = params['age_of_maturity'],
+        perlin_variation_params = params['perlin_variation_params']
+    )
+
+    rectify_map(lanes, merge_radius = merge_radius, forward_speed = params['forward_speed'])
+
+    nodeset = twist_optimize(lanes, iterations = twist_iterations, step = twist_step, lane_width = params['lane_width'])
+
+    generate_lane_boundaries(lanes, params['lane_width'])
+
+    for node in nodeset:
+        correct_junction_boundaries(lanes, node)
+
+    return lanes
+    
+
+def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, prevent_replication_radius, age_of_maturity, perlin_variation_params):
+                    #forward_speed, jitteriness, max_turn_speed,
+                    #replication_chance, spontaneous_death_chance,
+                    #merge_radius, prevent_replication_radius, age_of_maturity):
+    class PerlinVariation:
         scale = 200
         octaves = 1
         persistence = 0.1
         lacunarity = 2.0
 
-        
+        @staticmethod
         def paramAt(param, pos):
-            x = PerlinVariation.params[param]["x"]
-            y = PerlinVariation.params[param]["y"]
-            upper = PerlinVariation.params[param]["upper"]
-            lower = PerlinVariation.params[param]["lower"]
+            x = perlin_variation_params[param]["x"]
+            y = perlin_variation_params[param]["y"]
+            upper = perlin_variation_params[param]["upper"]
+            lower = perlin_variation_params[param]["lower"]
             noise_val = pnoise2(
                 (pos[0]/PerlinVariation.scale) + x,
                 (pos[1]/PerlinVariation.scale) + y,
@@ -112,12 +153,11 @@ def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, preven
     #points (list of tuples)
     #start (str)
     #end (str)
-    lanes = []
-    grid_to_lanes = defaultdict(set)
     spatial_hash_gridsize = max(50, prevent_replication_radius)
     
     while True:
         lanes = []
+        grid_to_lanes = defaultdict(set)
         agents = [ConstructionAgent(start_location = 0)]
         num_locations = 1
         simulation_step = 0
@@ -152,8 +192,8 @@ def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, preven
                 if not merge_enacted:
                     gridpoint = point_to_gridpoint(agent.position, spatial_hash_gridsize)
                     proximal_lanes = get_proximal_lanes_wrt_gridpoint(grid_to_lanes, gridpoint)
-                    for id in proximal_lanes:
-                        lane = lanes[id]
+                    for id in proximal_lanes: 
+                        lane = lanes[id] #RARE ENCOUNTERED ERROR: id out of range
                         for i, position in enumerate(lane['points']):
                             if (tupleDist(position, agent.position) < prevent_replication_radius):
                                 prevent_replication = True
@@ -214,11 +254,16 @@ def generate_rough_map(target_num_endpoints, forward_speed, merge_radius, preven
 
         #Crystalizing all still existing agents
         for agent in agents:
-            lanes.append({
+            newLane = {
                 "points": agent.history,
                 "start": agent.start_location,
                 "end": str(num_locations)
-            })
+            }
+            for point in newLane['points']:
+                gridpoint = point_to_gridpoint(point, spatial_hash_gridsize)
+                grid_to_lanes[gridpoint].add(len(lanes))
+            lanes.append(newLane)
+
             num_locations += 1
 
 
@@ -243,43 +288,56 @@ def rectify_short_lanes(lanes):
 
 
 
-def mark_combining_nodes(lanes, merge_radius = 20):
-    conjoined_nodes = []
-    for lane in lanes:
-        for loc in ["start", "end"]:
-            for other_lane in lanes:
-                if lane != other_lane:
-                    for other_loc in ["start", "end"]:
-                        dist = tupleDist(lane['points'][l_to_i[loc]], other_lane['points'][l_to_i[other_loc]])
-                        if dist < merge_radius: 
-                            conjoined_nodes.append(lane[loc])
-    
-    return conjoined_nodes
+def combine_nodes(lanes, merge_radius = 20, mark = False):
+    lane_to_grid, grid_to_lanes = lanes_spatial_hash(lanes, gridsize = max(merge_radius, 50), use_boundaries= False)
 
+    if mark:
+        conjoined_nodes = []
+    else:
+        node_power = defaultdict(int)
 
-
-def combine_nodes(lanes, merge_radius = 20):
-    node_power = defaultdict(int)
-    for lane in lanes:
-        for loc in ["start", "end"]:
-            for other_lane in lanes:
-                if lane != other_lane:
-                    for other_loc in ["start", "end"]:
-                        dist = tupleDist(lane['points'][l_to_i[loc]], other_lane['points'][l_to_i[other_loc]])
-                        if dist < merge_radius:
+    for id, lane in enumerate(tqdm(lanes, desc = "Merging nodes")):
+        proximal_lanes = get_proximal_lanes_wrt_lane(id, lane_to_grid, grid_to_lanes, extended = True)
+        for other_id in proximal_lanes:
+            other_lane = lanes[other_id]
+            for loc in ["start", "end"]:
+                for other_loc in ["start", "end"]:
+                    p0 = lane['points'][l_to_i[loc]]
+                    p1 = other_lane['points'][l_to_i[other_loc]]
+                    dist = tupleDist(p0, p1)
+                    if dist < merge_radius: 
+                        if mark:
+                            # We need to first ensure that no lane runs in between these two nodes
+                            obstruction_found = False
+                            for foreign_id in proximal_lanes:
+                                foreign_lane = lanes[foreign_id]
+                                pos_pairs = zip(foreign_lane['points'], foreign_lane['points'][1:])
+                                for fp0, fp1 in pos_pairs:
+                                    t_a, t_b = line_intersection_t(p0, p1, fp0, fp1)
+                                    if t_a > 0.01 and t_a < 0.99 and t_b > 0.01 and t_b < 0.99:
+                                        obstruction_found = True
+                                        break
+                            if not obstruction_found:
+                                conjoined_nodes.append(lane[loc])
+                        else:
                             if node_power[other_lane[other_loc]] > node_power[lane[loc]]:
                                 lane[loc] = other_lane[other_loc]
                                 node_power[other_lane[other_loc]]+=1
                             else:
                                 other_lane[other_loc] = lane[loc]
                                 node_power[lane[loc]]+=1
+    
+    if mark:
+        return conjoined_nodes
+
+                            
 
 
 def split_lanes(lanes, conjoined_nodes, merge_radius, forward_speed):
     #Splitting of lanes who have nodes ramming into them
     cutoff_length = math.ceil(merge_radius*2.0/forward_speed)
     lanes_to_add = []
-    for lane in lanes:
+    for lane in tqdm(lanes, desc = "Creating intersections between proximal lanes"):
         if len(lane['points']) == 0:
             continue
         for loc in ["start", "end"]:
@@ -291,12 +349,15 @@ def split_lanes(lanes, conjoined_nodes, merge_radius, forward_speed):
                 if lane.get("parent") == other_lane or other_lane.get("parent") == lane:
                     continue
                 found_index = -1
+                closest_dist = sys.maxsize
                 for i, pos in enumerate(other_lane['points']):
-                    if tupleDist(pos, loc_pos) < merge_radius and (lane != other_lane or (i > cutoff_length and i < len(lane['points']) - cutoff_length)):
-                            found_index = i
-                            break
+                    dist = tupleDist(pos, loc_pos)
+                    if (lane != other_lane or (i > cutoff_length and i < len(lane['points']) - cutoff_length)) and dist < closest_dist:
+                        found_index = i
+                        closest_dist = dist
                 
-                if found_index != -1:
+                
+                if closest_dist < merge_radius:
                     if found_index < 2:
                         found_index = 2
                     if found_index > len(other_lane['points'])-2:
@@ -316,6 +377,7 @@ def split_lanes(lanes, conjoined_nodes, merge_radius, forward_speed):
                     })
 
                     conjoined_nodes.append(lane[loc])
+                    #print(lane[loc])
                     break
         
 
@@ -337,7 +399,7 @@ def remove_identical_reference_lanes(lanes):
 def rectify_map(lanes, merge_radius, forward_speed):
     rectify_short_lanes(lanes)
 
-    conjoined_nodes = mark_combining_nodes(lanes, merge_radius)
+    conjoined_nodes = combine_nodes(lanes, merge_radius, mark = True)
 
     split_lanes(lanes, conjoined_nodes, merge_radius = merge_radius, forward_speed = forward_speed)
 
@@ -620,7 +682,7 @@ def squish_optimize(lanes, junction, r):
             a1 = (a[0]*b[0] + a[1]*b[1])/b_mag_squared
 
             if a1 <= 0.01:
-                if len(lanes[ep['id']]['points']) > 3:
+                if len(lanes[ep['id']]['points']) > 2:
                     lanes[ep['id']]['points'].pop(l_to_i[ep['loc']])
                 else:
                     break
@@ -637,7 +699,7 @@ def line_intersection_t(a0, a1, b0, b1):
 
     det = (av[1]*bv[0] - av[0]*bv[1])
     if det==0:
-        return False
+        return 0,0
 
     t_a = -bv[1]*(b0[0]-a0[0]) + bv[0]*(b0[1]-a0[1]) 
     t_b = -av[1]*(b0[0]-a0[0]) + av[0]*(b0[1]-a0[1]) 
@@ -662,7 +724,7 @@ def prune_intersecting_lanes(lanes):
         collision_detected = False
         for other_id in proximal_lanes:
             if id < other_id:
-                other_lane = lanes[other_id]
+                other_lane = lanes[other_id]                    
                 pairs = zip(lane['points'], lane['points'][1:])
                 for p0, p1 in pairs:
                     other_pairs = zip(other_lane['points'], other_lane['points'][1:])
@@ -727,9 +789,10 @@ def twist_optimize(lanes, iterations = 40, step = 0.00001, n = 3, lane_width = 1
         
         for i in range(iterations):
             for ep in junction:
-                if len(lanes[ep['id']]['points']) > n:
+                length = len(lanes[ep['id']]['points'])
+                if length > n:
                     stepTwistGradient(lanes, junction, ep, step = step, n = n, r = r)
-                else:
+                elif length > 2:
                     stepTwistGradient(lanes, junction, ep, step = step, n = 2, r = r)
 
         squish_optimize(lanes, junction, r)
@@ -815,15 +878,20 @@ def generate_lane_boundaries(lanes, lane_width):
 
         
 
-def findLineIntersection(a, av, b, bv): #each argument is a tuple
+def findLineIntersection(a, av, b, bv, return_t = False):
     det = (av[1]*bv[0] - av[0]*bv[1])
     if det==0:
         det = sys.float_info.min
 
-    t_a = -bv[1]*(b[0]-a[0]) + bv[0]*(b[1]-a[1]) 
-    t_a /= det
+    t_a = ( bv[0]*(b[1]-a[1]) - bv[1]*(b[0]-a[0]) ) /det
 
-    return (a[0] + t_a * av[0], a[1] + t_a * av[1])
+    pt = (a[0] + t_a * av[0], a[1] + t_a * av[1])
+
+    if return_t:
+        t_b = (av[0]*(b[1]-a[1]) - av[1]*(b[0]-a[0]) ) /det
+        return pt, t_a, t_b
+    else:
+        return pt
 
             
 
@@ -897,7 +965,6 @@ def point_to_gridpoint(point, gridsize):
 
 
 
-
 def lanes_spatial_hash(lanes, gridsize = 100, use_boundaries = True):
     lane_to_grid = defaultdict(set)
     grid_to_lanes  = defaultdict(set)
@@ -907,11 +974,20 @@ def lanes_spatial_hash(lanes, gridsize = 100, use_boundaries = True):
             pts = chain(lane['left_points'], lane['right_points'])
         else:
             pts = lane['points']
-        
+
+        last_gridpoint = None        
         for point in pts:
             gridpoint = point_to_gridpoint(point, gridsize)
             lane_to_grid[id].add(gridpoint)
             grid_to_lanes[gridpoint].add(id)
+
+            if last_gridpoint is not None and gridpoint[0] != last_gridpoint[0] and gridpoint[1] != last_gridpoint[1]:
+                gp1 = (gridpoint[0], last_gridpoint[1])
+                gp2 = (last_gridpoint[0], gridpoint[1])
+                lane_to_grid[id].update((gp1, gp2))
+                grid_to_lanes[gp1].add(id)
+                grid_to_lanes[gp2].add(id)
+            last_gridpoint = gridpoint
     return lane_to_grid, grid_to_lanes
 
 
@@ -921,18 +997,21 @@ gridhash_offsets = [
     (-1,1), (0,1), (1,1)
 ]
 
-def get_proximal_lanes_wrt_gridpoint(grid_to_lanes, gridpoint):
+def get_proximal_lanes_wrt_gridpoint(grid_to_lanes, gridpoint, extended = False):
     proximal_lanes = set()
-    for offset in gridhash_offsets:
+    for offset in (gridhash_offsets if extended else [(0, 0)]):
         new_point = (gridpoint[0]+offset[0], gridpoint[1]+offset[1])
         proximal_lanes.update(grid_to_lanes[new_point])
     
     return proximal_lanes
 
-def get_proximal_lanes_wrt_lane(laneID, lane_to_grid, grid_to_lanes):
+
+    
+
+def get_proximal_lanes_wrt_lane(laneID, lane_to_grid, grid_to_lanes, extended = False):
     proximal_lanes = set()
     for gridpoint in lane_to_grid[laneID]:
-        proximal_lanes.update(grid_to_lanes[gridpoint])
+        proximal_lanes.update(get_proximal_lanes_wrt_gridpoint(grid_to_lanes, gridpoint, extended = extended))
 
     proximal_lanes.discard(laneID)
 
@@ -940,9 +1019,10 @@ def get_proximal_lanes_wrt_lane(laneID, lane_to_grid, grid_to_lanes):
 
 
 
+
 def get_all_intersection_points(lanes, lane_to_grid, grid_to_lanes):
     intersecting_points = []
-    for id, lane in enumerate(tqdm(lanes)):
+    for id, lane in enumerate(tqdm(lanes, desc = "Flagging intersection points")):
         proximal_lanes = get_proximal_lanes_wrt_lane(id, lane_to_grid, grid_to_lanes)
         for other_id in proximal_lanes:
             if id < other_id:
@@ -963,3 +1043,12 @@ def get_all_intersection_points(lanes, lane_to_grid, grid_to_lanes):
 
                     
 
+
+def print_lane_points(lanes):
+    for id, lane in enumerate(lanes):
+        for pt in lane['left_points']:
+            print(f"{pt[0]} {pt[1]}")
+        print()
+        for pt in lane['right_points']:
+            print(f"{pt[0]} {pt[1]}")
+        print()

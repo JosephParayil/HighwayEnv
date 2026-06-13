@@ -106,7 +106,7 @@ class AbstractEnv(gym.Env):
             "offscreen_rendering": os.environ.get("OFFSCREEN_RENDERING", "0") == "1",
             "manual_control": False,
             "real_time_rendering": False,
-        }
+        } 
 
     def configure(self, config: dict) -> None:
         if config:

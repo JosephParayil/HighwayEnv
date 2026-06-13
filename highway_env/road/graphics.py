@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Tuple, Union
@@ -5,7 +6,9 @@ from typing import TYPE_CHECKING, Tuple, Union
 import numpy as np
 import pygame
 
-from highway_env.road.lane import AbstractLane, LineType
+import random
+
+from highway_env.road.lane import AbstractLane, LineType, PolyLane
 from highway_env.road.road import Road
 from highway_env.utils import Vector
 from highway_env.vehicle.graphics import VehicleGraphics
@@ -30,7 +33,7 @@ class WorldSurface(pygame.Surface):
     INITIAL_CENTERING = [0.5, 0.5]
     SCALING_FACTOR = 1.3
     MOVING_FACTOR = 0.1
-
+    
     def __init__(
         self, size: tuple[int, int], flags: object, surf: pygame.SurfaceType
     ) -> None:
@@ -110,6 +113,8 @@ class WorldSurface(pygame.Surface):
                 self.centering_position[0] += self.MOVING_FACTOR
 
 
+from itertools import chain
+
 class LaneGraphics:
     """A visualization of a lane."""
 
@@ -117,7 +122,7 @@ class LaneGraphics:
     STRIPE_SPACING: float = 4.33
     """ Offset between stripes [m]"""
 
-    STRIPE_LENGTH: float = 3
+    STRIPE_LENGTH: float = 3    
     """ Length of a stripe [m]"""
 
     STRIPE_WIDTH: float = 0.3
@@ -125,21 +130,43 @@ class LaneGraphics:
 
     @classmethod
     def display(cls, lane: AbstractLane, surface: WorldSurface) -> None:
+        return
         """
         Display a lane on a surface.
 
         :param lane: the lane to be displayed
         :param surface: the pygame surface
         """
+
+
+        
+        # --- 1. OPTIMIZED PATH FOR POLYLANE ---
+        if isinstance(lane, PolyLane) and lane.line_types[0] == LineType.CONTINUOUS and lane.line_types[1] == LineType.CONTINUOUS:
+            thickness = max(surface.pix(cls.STRIPE_WIDTH), 1)
+
+            
+            left_pixels = [surface.vec2pix(pt) for pt in lane.left_boundary_points]
+            right_pixels = [surface.vec2pix(pt) for pt in lane.right_boundary_points]
+
+            pygame.draw.lines(surface, surface.WHITE, False, left_pixels, thickness)
+            pygame.draw.lines(surface, surface.WHITE, False, right_pixels, thickness)
+
+            for pt in chain(left_pixels, right_pixels):
+                pygame.draw.circle(surface, surface.WHITE, pt, surface.scaling*0.5)
+
+            return
+        
         stripes_count = int(
             2
             * (surface.get_height() + surface.get_width())
             / (cls.STRIPE_SPACING * surface.scaling)
         )
         s_origin, _ = lane.local_coordinates(surface.origin)
+
         s0 = (
             int(s_origin) // cls.STRIPE_SPACING - stripes_count // 2
         ) * cls.STRIPE_SPACING
+
         for side in range(2):
             if lane.line_types[side] == LineType.STRIPED:
                 cls.striped_line(lane, surface, stripes_count, s0, side)
@@ -194,12 +221,9 @@ class LaneGraphics:
         :param side: which side of the road to draw [0:left, 1:right]
         """
         starts = longitudinal + np.arange(stripes_count) * cls.STRIPE_SPACING
-        ends = (
-            longitudinal
-            + np.arange(stripes_count) * cls.STRIPE_SPACING
-            + cls.STRIPE_SPACING
-        )
-        lats = [(side - 0.5) * lane.width_at(s) for s in starts]
+        ends = longitudinal + np.arange(stripes_count) * cls.STRIPE_SPACING + cls.STRIPE_SPACING
+
+        lats = [(side - 0.5) * lane.width_at(s) for s in starts] 
         cls.draw_stripes(lane, surface, starts, ends, lats)
 
     @classmethod

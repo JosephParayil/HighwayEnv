@@ -700,13 +700,16 @@ class LidarObservation(ObservationType):
 
     def observe(self) -> np.ndarray:
         obs = self.trace(
-            self.observer_vehicle.position, self.observer_vehicle.velocity
+            self.observer_vehicle
         ).copy()
         if self.normalize:
             obs /= self.maximum_range
         return obs
 
-    def trace(self, origin: np.ndarray, origin_velocity: np.ndarray) -> np.ndarray:
+    def trace(self, vehicle: Vehicle) -> np.ndarray:
+        origin = vehicle.position
+        origin_velocity = vehicle.velocity
+
         self.origin = origin.copy()
         self.grid = np.ones((self.cells, 2), dtype=np.float32) * self.maximum_range
 
@@ -767,6 +770,106 @@ class LidarObservation(ObservationType):
     def index_to_direction(self, index: int) -> np.ndarray:
         return np.array([np.cos(index * self.angle), np.sin(index * self.angle)])
 
+from highway_env.envs.generation.generator import point_to_gridpoint, lanes_spatial_hash, get_proximal_lanes_wrt_gridpoint, findLineIntersection, tupleDist
+from itertools import chain
+import math
+import sys
+
+class LaneLidarObservation(LidarObservation):
+    PARTITION_GRID_SIZE = 100
+    
+    def __init__(
+        self,
+        env,
+        cells: int = 16,
+        maximum_range: float = 60,
+        normalize: bool = True,
+        **kwargs,
+    ):
+        super().__init__(env, cells, maximum_range, normalize, **kwargs)
+        self.heading = 0
+        
+    
+    def hash_lanes(self, lanes):
+        self.lanes = lanes
+        _, self.grid_to_lanes = lanes_spatial_hash(lanes, LaneLidarObservation.PARTITION_GRID_SIZE, use_boundaries = True)
+
+
+    def trace(self, vehicle: Vehicle) -> np.ndarray:
+        origin = vehicle.position
+        origin_velocity = vehicle.velocity
+        self.origin = origin.copy()
+
+        self.heading = vehicle.heading
+        self.grid = np.ones((self.cells, 2), dtype=np.float32) * self.maximum_range
+
+        self.visited_gridpoints = []
+
+        if not hasattr(self, "lanes"):
+            return self.grid
+
+        
+        for index in range(self.cells):
+            angle = index * self.angle + vehicle.heading
+            vx = math.cos(angle)
+            vy = math.sin(angle)
+
+            #Filling the distance value
+            gx, gy = point_to_gridpoint(origin, LaneLidarObservation.PARTITION_GRID_SIZE)
+            
+            lanes_checked = set()
+            while True:
+                if index == 0:
+                    self.visited_gridpoints.append((gx, gy))
+
+                local_lanes = get_proximal_lanes_wrt_gridpoint(self.grid_to_lanes, (gx, gy))
+                
+                closest_distance = self.maximum_range
+                for id in local_lanes - lanes_checked:
+                    lane = self.lanes[id]
+                    my_left_pairs = zip(lane['left_points'], lane['left_points'][1:])
+                    my_right_pairs = zip(lane['right_points'], lane['right_points'][1:])
+
+                    for p0, p1 in chain(my_left_pairs, my_right_pairs):
+                        intersect_pt, t_ray, t_segment = findLineIntersection(origin,   (vx, vy), 
+                                                                              p0,       (p1[0]-p0[0], p1[1]-p0[1]), 
+                                                                              return_t = True)
+                        
+                        if t_segment >= 0 and t_segment <= 1 and t_ray >= 0 and t_ray <= self.maximum_range:
+                            dist = t_ray# * self.maximum_range
+                            if dist < closest_distance:
+                                closest_distance = dist 
+
+                if closest_distance < self.maximum_range:
+                    self.grid[index, LidarObservation.DISTANCE] = closest_distance
+                    break
+                
+
+                lanes_checked.update(local_lanes)
+
+                # Calculating next grid sector to continue our search
+                next_gx = gx + (1 if vx > 0 else 0)
+                next_gy = gy + (1 if vy > 0 else 0)
+                next_gx_t = self.maximum_range+1 if vx == 0 else ((LaneLidarObservation.PARTITION_GRID_SIZE*next_gx)-origin[0])/vx
+                next_gy_t = self.maximum_range+1 if vy == 0 else ((LaneLidarObservation.PARTITION_GRID_SIZE*next_gy)-origin[1])/vy
+
+                if min(next_gx_t, next_gy_t) > self.maximum_range:
+                    break 
+
+                if (next_gx_t <= next_gy_t):
+                    gx = next_gx if vx > 0 else next_gx-1
+                if (next_gy_t <= next_gx_t):
+                    gy = next_gy if vy > 0 else next_gy-1
+
+            # All lanes are stationary, so the SPEED values only depend on the ego-vehicle's own velocity
+            self.grid[index, LidarObservation.SPEED] = -origin_velocity[0] * vx -origin_velocity[1] *vy
+
+        return self.grid
+        
+
+        
+
+
 
 def observation_factory(env: AbstractEnv, config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
@@ -787,6 +890,8 @@ def observation_factory(env: AbstractEnv, config: dict) -> ObservationType:
         return TupleObservation(env, **config)
     elif config["type"] == "LidarObservation":
         return LidarObservation(env, **config)
+    elif config["type"] == "LaneLidarObservation":
+        return LaneLidarObservation(env, **config)
     elif config["type"] == "ExitObservation":
         return ExitObservation(env, **config)
     else:

@@ -131,4 +131,6 @@ def _register_highway_envs():
     register(id="u-turn-v0", entry_point="highway_env.envs.u_turn_env:UTurnEnv")
 
 
+
+
 _register_highway_envs()

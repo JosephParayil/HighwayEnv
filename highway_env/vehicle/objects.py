@@ -195,6 +195,28 @@ class RoadObject(ABC):
             lane.local_coordinates(other.position)[0]
             - lane.local_coordinates(self.position)[0]
         )
+    
+    def intersects_with_line(self, p0: np.ndarray, p1: np.ndarray) -> bool:
+        """
+        Determine whether this RoadObject rectangle intersects with a line segment.
+        """
+        # 1. Format the line segment as a 2-vertex polygon array
+        # (Matches the shape format expected by polygon intersection algorithms)
+        line_polygon = np.array([p0, p1])
+        
+        # 2. Get the 5-point closed polygon of this RoadObject
+        rect_polygon = self.polygon()
+        
+        # 3. Call your existing intersection function with zero velocity/displacement
+        # (Assuming utils.are_polygons_intersecting returns: intersecting, will_intersect, ...)
+        intersecting, _, _ = utils.are_polygons_intersecting(
+            rect_polygon, 
+            line_polygon, 
+            np.zeros(2), 
+            np.zeros(2)
+        )
+        
+        return intersecting
 
     @property
     def on_road(self) -> bool:

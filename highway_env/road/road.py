@@ -399,7 +399,8 @@ class Road:
         road_objects: list[objects.RoadObject] = None,
         np_random: np.random.RandomState = None,
         record_history: bool = False,
-    ) -> None:
+        record_vehicle_lane: bool = True
+    ) -> None: 
         """
         New road.
 
@@ -414,6 +415,7 @@ class Road:
         self.objects = road_objects or []
         self.np_random = np_random if np_random else np.random.RandomState()
         self.record_history = record_history
+        self.record_vehicle_lane = record_vehicle_lane
 
     def close_objects_to(
         self,
@@ -462,6 +464,7 @@ class Road:
         """Decide the actions of each entity on the road."""
         for vehicle in self.vehicles:
             vehicle.act()
+            
 
     def step(self, dt: float) -> None:
         """

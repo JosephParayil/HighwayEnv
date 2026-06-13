@@ -8,6 +8,9 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from highway_env.envs.generation.generator import *
 
+
+# Made with ChatGPT
+
 # --- Camera -----------------------------------------------------------
 
 class Camera:
@@ -62,11 +65,14 @@ def draw_line(surface, camera, color, wx1, wy1, wx2, wy2, width=1):
 
 # --- Generation Parameters -------------------------
 
+# Lane width
+lane_width = 10
+
 # World
 target_num_endpoints = 1000
 
 # Movement
-forward_speed = 10
+forward_speed = lane_width
 
 # Proximity & Time
 merge_radius = 2*forward_speed
@@ -75,11 +81,10 @@ prevent_replication_radius = age_of_maturity * forward_speed
 
 
 # Twist Optimization
-twist_iterations = 2*forward_speed
+twist_iterations = 4*forward_speed
 twist_step = 0.0002/forward_speed
 
-# Lane width
-lane_width = 10
+
 
 # --- Visual constants -------------------------------------------------
 
@@ -98,6 +103,7 @@ NODE_BG_COLOR     = (30,  30,  30)    # small background pill behind label
 NODE_RADIUS_COLOR = (60, 120, 180)    # thin merge-radius circle
 MERGE_RADIUS      = merge_radius                # must match generator value
 DRAW_MERGE_RADII = False
+DRAW_ENDPOINTS = True
 
 PAN_SPEED   = 5.0    # world units per frame at zoom=1 (scaled by 1/zoom so speed feels constant)
 ZOOM_SPEED  = 0.05
@@ -174,25 +180,26 @@ def draw_lanes(surface, camera, lanes, node_font, stage):
     # --- Pass 3: node labels ---
     # Collect (node_id_string, screen_x, screen_y) for start and end of every lane.
     # Duplicates are intentional — multiple lanes share the same node.
-    node_labels = []
-    for lane in lanes:
-        pts = lane['points']
-        if not pts:
-            continue
-        # start node
-        sx, sy = camera.world_to_screen(*pts[0])
-        node_labels.append((lane['start'], sx, sy))
-        # end node
-        sx, sy = camera.world_to_screen(*pts[-1])
-        node_labels.append((lane['end'], sx, sy))
+    if DRAW_ENDPOINTS:
+        node_labels = []
+        for lane in lanes:
+            pts = lane['points']
+            if not pts:
+                continue
+            # start node
+            sx, sy = camera.world_to_screen(*pts[0])
+            node_labels.append((lane['start'], sx, sy))
+            # end node
+            sx, sy = camera.world_to_screen(*pts[-1])
+            node_labels.append((lane['end'], sx, sy))
 
-    for node_id, sx, sy in node_labels:
-        text_surf = node_font.render(node_id, True, NODE_COLOR)
-        tw, th = text_surf.get_size()
-        pad = 3
-        bg_rect = pygame.Rect(sx - tw // 2 - pad, sy - th // 2 - pad, tw + pad * 2, th + pad * 2)
-        pygame.draw.rect(surface, NODE_BG_COLOR, bg_rect, border_radius=3)
-        surface.blit(text_surf, (sx - tw // 2, sy - th // 2))
+        for node_id, sx, sy in node_labels:
+            text_surf = node_font.render(node_id, True, NODE_COLOR)
+            tw, th = text_surf.get_size()
+            pad = 3
+            bg_rect = pygame.Rect(sx - tw // 2 - pad, sy - th // 2 - pad, tw + pad * 2, th + pad * 2)
+            pygame.draw.rect(surface, NODE_BG_COLOR, bg_rect, border_radius=3)
+            surface.blit(text_surf, (sx - tw // 2, sy - th // 2))
 
 
 def draw_interest_points(points, surface, camera):
@@ -312,7 +319,7 @@ def main():
                         case 1:
                             rectify_short_lanes(lanes)
                         case 2:
-                            conjoined_nodes = mark_combining_nodes(lanes, merge_radius)
+                            conjoined_nodes = combine_nodes(lanes, merge_radius, mark = True)
                             split_lanes(lanes, conjoined_nodes, merge_radius = merge_radius, forward_speed = forward_speed)
                         case 3:
                             rectify_short_lanes(lanes)
@@ -385,7 +392,7 @@ def main():
 
         # --- Draw ---
         screen.fill(BG_COLOR)
-        draw_grid(screen, camera, spacing=20)
+        draw_grid(screen, camera, spacing=50)
         draw_lanes(screen, camera, lanes, node_font, stage)
         draw_hud(screen, hud_font, camera)
         if stage > 10:
