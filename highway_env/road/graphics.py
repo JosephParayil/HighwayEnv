@@ -1,12 +1,10 @@
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import pygame
-
-import random
+from itertools import chain
 
 from highway_env.road.lane import AbstractLane, LineType, PolyLane
 from highway_env.road.road import Road
@@ -130,7 +128,7 @@ class LaneGraphics:
 
     @classmethod
     def display(cls, lane: AbstractLane, surface: WorldSurface) -> None:
-        return
+        #return
         """
         Display a lane on a surface.
 
@@ -324,11 +322,16 @@ class RoadGraphics:
         :param road: the road to be displayed
         :param surface: the pygame surface
         """
+
+        lanes_displayed = []
         surface.fill(surface.GREY)
         for _from in road.network.graph.keys():
             for _to in road.network.graph[_from].keys():
                 for l in road.network.graph[_from][_to]:
-                    LaneGraphics.display(l, surface)
+                    if not l in lanes_displayed: # to avoid repeat drawing of bidirectional lanes
+                        LaneGraphics.display(l, surface)
+                        lanes_displayed.append(l)
+        
 
     @staticmethod
     def display_traffic(

@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 from scipy import interpolate
 
-
 class LinearSpline2D:
     """
     Piece-wise linear curve fitted to a list of points.
@@ -46,7 +45,6 @@ class LinearSpline2D:
         idx_pose = self._get_idx_segment_for_lon(lon)
         pose = self.poses[idx_pose]
         return pose.normal
-
     def cartesian_to_frenet(self, position: tuple[float, float]) -> tuple[float, float]:
         """
         Transform the point in Cartesian coordinates into Frenet coordinates of the curve

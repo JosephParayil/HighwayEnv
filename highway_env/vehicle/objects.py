@@ -30,7 +30,7 @@ class RoadObject(ABC):
         road: Road,
         position: Sequence[float],
         heading: float = 0,
-        speed: float = 0,
+        speed: float = 0
     ):
         """
         :param road: the road instance where the object is placed in
@@ -198,17 +198,12 @@ class RoadObject(ABC):
     
     def intersects_with_line(self, p0: np.ndarray, p1: np.ndarray) -> bool:
         """
-        Determine whether this RoadObject rectangle intersects with a line segment.
+        Determine if intersecting with a line segment.
         """
-        # 1. Format the line segment as a 2-vertex polygon array
-        # (Matches the shape format expected by polygon intersection algorithms)
         line_polygon = np.array([p0, p1])
         
-        # 2. Get the 5-point closed polygon of this RoadObject
         rect_polygon = self.polygon()
         
-        # 3. Call your existing intersection function with zero velocity/displacement
-        # (Assuming utils.are_polygons_intersecting returns: intersecting, will_intersect, ...)
         intersecting, _, _ = utils.are_polygons_intersecting(
             rect_polygon, 
             line_polygon, 
@@ -251,3 +246,6 @@ class Landmark(RoadObject):
     ):
         super().__init__(road, position, heading, speed)
         self.solid = False
+
+
+

@@ -383,7 +383,6 @@ class CircularLane(AbstractLane):
             },
         }
 
-
 class PolyLaneFixedWidth(AbstractLane):
     """
     A fixed-width lane defined by a set of points and approximated with a 2D Hermite polynomial.
@@ -409,6 +408,7 @@ class PolyLaneFixedWidth(AbstractLane):
     def position(self, longitudinal: float, lateral: float) -> np.ndarray:
         x, y = self.curve(longitudinal)
         yaw = self.heading_at(longitudinal)
+        
         return np.array([x - np.sin(yaw) * lateral, y + np.cos(yaw) * lateral])
 
     def local_coordinates(self, position: np.ndarray) -> tuple[float, float]:

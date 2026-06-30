@@ -3,6 +3,11 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Callable
 
+import math
+from highway_env.envs.generation.generator import point_to_gridpoint
+from highway_env.envs.common.observation import LidarObservation, LaneLidarObservation, NavigationObservation
+import cv2
+
 import numpy as np
 import pygame
 
@@ -18,6 +23,7 @@ from highway_env.vehicle.graphics import VehicleGraphics
 if TYPE_CHECKING:
     from highway_env.envs import AbstractEnv
     from highway_env.envs.common.abstract import Action
+    from highway_env.envs.common.observation import LidarObservation, LaneLidarObservation
 
 
 class EnvViewer:
@@ -131,7 +137,6 @@ class EnvViewer:
         RoadGraphics.display_road_objects(
             self.env.road, self.sim_surface, offscreen=self.offscreen
         )
-        
 
         if EnvViewer.agent_display:
             EnvViewer.agent_display(self.agent_surface, self.sim_surface)
@@ -151,7 +156,6 @@ class EnvViewer:
             simulation_frequency=self.env.config["simulation_frequency"],
             offscreen=self.offscreen,
         )
-        
 
         ObservationGraphics.display(self.env.observation_type, self.sim_surface)
         
@@ -169,7 +173,6 @@ class EnvViewer:
             )
             self.frame += 1
         
-
     def get_image(self) -> np.ndarray:
         """
         The rendered image as a rgb array.
@@ -254,77 +257,34 @@ class EventHandler:
                 action[0] = 0
         action_type.act(action)
 
-import math
-from highway_env.envs.generation.generator import point_to_gridpoint
-from highway_env.envs.common.observation import LidarObservation, LaneLidarObservation
-import cv2
+
 
 class ObservationGraphics:
-    COLOR = (0, 0, 0)
+    LIDAR_COLOR = (0, 0, 0) # applies to display_grid and display_rays
+    GRID_COLOR = (100, 0, 0) # display_partition_grid
+    SPECIAL_GRID_COLOR = (255, 0, 0) # display_visited_gridpoints
+    NAV_COLOR = (200, 200, 0) #display_navigation_arrow
 
     @classmethod
     def display(cls, obs, sim_surface):
-        if type(obs) is LaneLidarObservation:
+        if type(obs) is NavigationObservation:
+            cls.display_navigation_arrow(obs, sim_surface)
+        elif type(obs) is LaneLidarObservation:
             cls.display_rays(obs, sim_surface)
             #cls.display_partition_grid(obs, sim_surface, 5)
             #cls.display_visited_gridpoints(obs, sim_surface)
         elif type(obs) is LidarObservation:
             cls.display_grid(obs, sim_surface)
 
-
     @classmethod
-    def display_visited_gridpoints(cls, obs, surface):
-        gsize = LaneLidarObservation.PARTITION_GRID_SIZE
-        for gp in obs.visited_gridpoints:
-            pts = [
-                surface.pos2pix(gp[0]*gsize, gp[1]*gsize),
-                surface.pos2pix((gp[0]+1)*gsize, gp[1]*gsize),
-                surface.pos2pix((gp[0]+1)*gsize, (gp[1]+1)*gsize),
-                surface.pos2pix(gp[0]*gsize, (gp[1]+1)*gsize)
-                
-            ]
+    def display_navigation_arrow(cls, nav_observation, surface):
+        origin = nav_observation.observer_vehicle.position
             
-
-            pygame.draw.polygon(surface, (0,0,0), pts, 5)
-            
-
-
-    @classmethod
-    def display_partition_grid(cls, obs, surface, bounds):
-        gsize = LaneLidarObservation.PARTITION_GRID_SIZE
-        center_gx, center_gy = point_to_gridpoint(obs.origin, gsize)
-
-        lower_gx = center_gx-bounds
-        upper_gx = center_gx+bounds
-        lower_gy = center_gy-bounds
-        upper_gy = center_gy+bounds
-
-        for gx in range(lower_gx, upper_gx):
-            pygame.draw.line(surface, (100, 0, 0), 
-                            surface.pos2pix(gx*gsize, lower_gy*gsize),
-                            surface.pos2pix(gx*gsize, upper_gy*gsize), 
-                            2)
-        
-        for gy in range(lower_gy, upper_gy):
-            pygame.draw.line(surface, (100, 0, 0), 
-                            surface.pos2pix(lower_gx*gsize, gy*gsize),
-                            surface.pos2pix(upper_gx*gsize, gy*gsize), 
-                            2)
-                
-
-
-
-
-    @classmethod
-    def display_rays(cls, lanelidar_observation, surface):
-        for index in range(lanelidar_observation.cells): #[0]:
-            angle = index * lanelidar_observation.angle + lanelidar_observation.heading
-            dist = lanelidar_observation.grid[index][0]
-            world_x = lanelidar_observation.origin[0] + math.cos(angle) * dist
-            world_y = lanelidar_observation.origin[1] + math.sin(angle) * dist
-            origin = surface.pos2pix(lanelidar_observation.origin[0], lanelidar_observation.origin[1])
-            point = surface.pos2pix(world_x, world_y)
-            pygame.draw.line(surface, ObservationGraphics.COLOR, origin, point, 1)
+        pygame.draw.line(surface, ObservationGraphics.NAV_COLOR,
+            surface.pos2pix(origin[0], origin[1]),
+            surface.pos2pix(nav_observation.waypoint[0], nav_observation.waypoint[1]),
+            1
+        )
 
     @classmethod
     def display_grid(cls, lidar_observation, surface):
@@ -349,4 +309,63 @@ class ObservationGraphics:
             )
             for i in range(np.size(psi))
         ]
-        pygame.draw.lines(surface, ObservationGraphics.COLOR, True, points, 1)
+        pygame.draw.lines(surface, ObservationGraphics.LIDAR_COLOR, True, points, 1)
+
+        surface.pos2pix()
+
+
+    ### LaneLidarObservation Methods: ###
+    @classmethod
+    def display_rays(cls, lanelidar_observation, surface):
+        for index in range(lanelidar_observation.cells): #[0]:
+            angle = index * lanelidar_observation.angle + lanelidar_observation.heading
+            dist = lanelidar_observation.grid[index][0]
+            world_x = lanelidar_observation.origin[0] + math.cos(angle) * dist
+            world_y = lanelidar_observation.origin[1] + math.sin(angle) * dist
+            origin = surface.pos2pix(lanelidar_observation.origin[0], lanelidar_observation.origin[1])
+            point = surface.pos2pix(world_x, world_y)
+            pygame.draw.line(surface, ObservationGraphics.LIDAR_COLOR, origin, point, 1)
+
+
+            
+
+    @classmethod
+    def display_partition_grid(cls, obs, surface, bounds):
+        gsize = LaneLidarObservation.PARTITION_GRID_SIZE
+        center_gx, center_gy = point_to_gridpoint(obs.origin, gsize)
+
+        lower_gx = center_gx-bounds
+        upper_gx = center_gx+bounds
+        lower_gy = center_gy-bounds
+        upper_gy = center_gy+bounds
+
+        for gx in range(lower_gx, upper_gx):
+            pygame.draw.line(surface, ObservationGraphics.GRID_COLOR, 
+                            surface.pos2pix(gx*gsize, lower_gy*gsize),
+                            surface.pos2pix(gx*gsize, upper_gy*gsize), 
+                            2)
+        
+        for gy in range(lower_gy, upper_gy):
+            pygame.draw.line(surface, ObservationGraphics.GRID_COLOR, 
+                            surface.pos2pix(lower_gx*gsize, gy*gsize),
+                            surface.pos2pix(upper_gx*gsize, gy*gsize), 
+                            2)
+                
+
+
+    @classmethod
+    def display_visited_gridpoints(cls, obs, surface):
+        gsize = LaneLidarObservation.PARTITION_GRID_SIZE
+        for gp in obs.visited_gridpoints:
+            pts = [
+                surface.pos2pix(gp[0]*gsize, gp[1]*gsize),
+                surface.pos2pix((gp[0]+1)*gsize, gp[1]*gsize),
+                surface.pos2pix((gp[0]+1)*gsize, (gp[1]+1)*gsize),
+                surface.pos2pix(gp[0]*gsize, (gp[1]+1)*gsize)
+                
+            ]
+            
+
+            pygame.draw.polygon(surface, ObservationGraphics.SPECIAL_GRID_COLOR, pts, 5)
+            
+

@@ -10,10 +10,10 @@ from gymnasium import spaces
 
 from highway_env import utils
 from highway_env.envs.common.finite_mdp import compute_ttc_grid
-from highway_env.envs.common.graphics import EnvViewer
 from highway_env.road.lane import AbstractLane
 from highway_env.utils import Vector
 from highway_env.vehicle.kinematics import Vehicle
+from highway_env.vehicle.objects import Landmark
 
 
 if TYPE_CHECKING:
@@ -770,14 +770,12 @@ class LidarObservation(ObservationType):
     def index_to_direction(self, index: int) -> np.ndarray:
         return np.array([np.cos(index * self.angle), np.sin(index * self.angle)])
 
-from highway_env.envs.generation.generator import point_to_gridpoint, lanes_spatial_hash, get_proximal_lanes_wrt_gridpoint, findLineIntersection, tupleDist
+from highway_env.envs.generation.generator import point_to_gridpoint, lanes_spatial_hash, get_proximal_lanes_wrt_gridpoint, find_line_intersection
 from itertools import chain
 import math
 import sys
 
 class LaneLidarObservation(LidarObservation):
-    PARTITION_GRID_SIZE = 100
-    
     def __init__(
         self,
         env,
@@ -790,9 +788,6 @@ class LaneLidarObservation(LidarObservation):
         self.heading = 0
         
     
-    def hash_lanes(self, lanes):
-        self.lanes = lanes
-        _, self.grid_to_lanes = lanes_spatial_hash(lanes, LaneLidarObservation.PARTITION_GRID_SIZE, use_boundaries = True)
 
 
     def trace(self, vehicle: Vehicle) -> np.ndarray:
@@ -805,9 +800,11 @@ class LaneLidarObservation(LidarObservation):
 
         self.visited_gridpoints = []
 
-        if not hasattr(self, "lanes"):
+        if self.env.road.network.grid_to_lanes is None:
+            print("Road network not hashed")
             return self.grid
 
+        gridsize = self.env.road.network.partition_gridsize
         
         for index in range(self.cells):
             angle = index * self.angle + vehicle.heading
@@ -815,24 +812,24 @@ class LaneLidarObservation(LidarObservation):
             vy = math.sin(angle)
 
             #Filling the distance value
-            gx, gy = point_to_gridpoint(origin, LaneLidarObservation.PARTITION_GRID_SIZE)
+            gx, gy = point_to_gridpoint(origin, gridsize)
             
             lanes_checked = set()
             while True:
                 if index == 0:
                     self.visited_gridpoints.append((gx, gy))
 
-                local_lanes = get_proximal_lanes_wrt_gridpoint(self.grid_to_lanes, (gx, gy))
+                local_lanes = get_proximal_lanes_wrt_gridpoint(self.env.road.network.grid_to_lanes, (gx, gy))
                 
                 closest_distance = self.maximum_range
-                for id in local_lanes - lanes_checked:
-                    lane = self.lanes[id]
-                    my_left_pairs = zip(lane['left_points'], lane['left_points'][1:])
-                    my_right_pairs = zip(lane['right_points'], lane['right_points'][1:])
+                for lane_index in local_lanes - lanes_checked:
+                    lane = self.env.road.network.get_lane(lane_index)
+                    left_pairs = zip(lane.left_boundary_points, lane.left_boundary_points[1:])
+                    right_pairs = zip(lane.right_boundary_points, lane.right_boundary_points[1:])
 
-                    for p0, p1 in chain(my_left_pairs, my_right_pairs):
-                        intersect_pt, t_ray, t_segment = findLineIntersection(origin,   (vx, vy), 
-                                                                              p0,       (p1[0]-p0[0], p1[1]-p0[1]), 
+                    for p0, p1 in chain(left_pairs, right_pairs):
+                        intersect_pt, t_ray, t_segment = find_line_intersection(origin,   np.array([vx, vy]), 
+                                                                              p0,       p1-p0, 
                                                                               return_t = True)
                         
                         if t_segment >= 0 and t_segment <= 1 and t_ray >= 0 and t_ray <= self.maximum_range:
@@ -850,8 +847,8 @@ class LaneLidarObservation(LidarObservation):
                 # Calculating next grid sector to continue our search
                 next_gx = gx + (1 if vx > 0 else 0)
                 next_gy = gy + (1 if vy > 0 else 0)
-                next_gx_t = self.maximum_range+1 if vx == 0 else ((LaneLidarObservation.PARTITION_GRID_SIZE*next_gx)-origin[0])/vx
-                next_gy_t = self.maximum_range+1 if vy == 0 else ((LaneLidarObservation.PARTITION_GRID_SIZE*next_gy)-origin[1])/vy
+                next_gx_t = self.maximum_range+1 if vx == 0 else ((gridsize*next_gx)-origin[0])/vx
+                next_gy_t = self.maximum_range+1 if vy == 0 else ((gridsize*next_gy)-origin[1])/vy
 
                 if min(next_gx_t, next_gy_t) > self.maximum_range:
                     break 
@@ -868,6 +865,260 @@ class LaneLidarObservation(LidarObservation):
         
 
         
+class NavigationObservation(ObservationType):
+    waypoint_memory_distance_threshold = 0
+    waypoint_offset = 2
+
+    def space(self) -> spaces.Space:
+        low = np.array([0.0, -1.0, -1.0], dtype=np.float32)
+        high = np.array([np.inf, 1.0, 1.0], dtype=np.float32)
+        return spaces.Box(shape=(3,), low=low, high=high, dtype=np.float32)
+
+
+    def __init__(self, env: AbstractEnv, **kwargs) -> None:
+        super().__init__(env, **kwargs)
+
+        if self.observer_vehicle is None or not hasattr(self.observer_vehicle, "goal") or self.observer_vehicle.goal is None:
+            return
+        self.goal_pos = self.observer_vehicle.goal.position
+        self.goal_lane_index = self.env.road.network.get_closest_lane_index(self.goal_pos, 0)
+       
+        self.create_path_generator()
+        
+        self.node = self.path[0]
+
+        self.cached_paths = []
+        self.waypoint = self.get_waypoint()
+    
+    def create_path_generator(self):
+        start_lane_index = self.observer_vehicle.lane_index
+        start_node = self.getNextNode(start_lane_index)
+        
+        self.path_generator = self.env.road.network.bfs_paths(start_node, self.goal_lane_index[0])
+        self.path = next(self.path_generator)
+        
+        # If, despite our initial start node preference, the path takes us through the other node, we just start from this other node
+        if len(self.path) > 1 and self.path[1]==start_lane_index[0] or self.path[1]==start_lane_index[1]:
+            self.path.pop(0)
+
+        # If we pass through the other endpoint of the goal lane anyway, we should not need to traverse across this lane
+        if self.goal_lane_index[1] in self.path:
+            self.path_generator = self.env.road.network.bfs_paths(start_node, self.goal_lane_index[1])
+            self.path = next(self.path_generator)
+
+    def getNextNode(self, lane_index):
+        _from, _to, _ = lane_index
+        lane = self.env.road.network.get_lane(lane_index)
+
+        # We have two potential 'nodes' to choose from. We prefer the one in the direction we are already aligned in
+        lane_heading = lane.heading_at(lane.local_coordinates(self.observer_vehicle.position)[0])
+        raw_diff = lane_heading - self.observer_vehicle.heading
+        shortest_diff = (raw_diff + np.pi) % (2 * np.pi) - np.pi
+        heading_offset = np.abs(shortest_diff)
+
+        if (heading_offset > np.pi / 2) == (lane_index in self.env.road.network.reversed_lane_indices):
+            return _to
+        else:
+            return _from
+
+
+
+    def observe(self):
+        if self.observer_vehicle is None or not hasattr(self.observer_vehicle, "goal") or self.observer_vehicle.goal is None:
+            return np.zeros(3, dtype=np.float32)
+        
+        self.update_next_node()
+        self.waypoint = self.get_waypoint()
+
+        waypt_offset = self.waypoint-self.observer_vehicle.position
+        absolute_heading_to_waypt = np.arctan2(waypt_offset[1], waypt_offset[0])
+
+        # Completely different from delta_h, cos_dh, sin_dh in RelativeGoalObservation
+        delta_h = absolute_heading_to_waypt - self.observer_vehicle.heading
+        cos_dh = np.cos(delta_h)
+        sin_dh = np.sin(delta_h)
+
+        distance = np.linalg.norm(waypt_offset)
+
+        return np.array(
+            [distance, cos_dh, sin_dh],
+            dtype=np.float32,
+        )
+        
+
+    def get_waypoint(self):
+        if self.node == -1:
+            return self.goal_pos
+        
+        # Find the lane that goes from self.node to the next node in the path sequence
+        index = self.path.index(self.node) # node is guaranteed to be in path
+        if index == len(self.path)-1:
+            lane_index = self.goal_lane_index
+        else:
+            next_node = self.path[index+1]
+            lane_index = (self.node, next_node, 0)
+
+
+        lane = self.env.road.network.get_lane(lane_index)
+
+        if lane_index in self.env.road.network.reversed_lane_indices:
+            return lane.curve(lane.length - NavigationObservation.waypoint_offset)
+        else:
+            return lane.curve(NavigationObservation.waypoint_offset)
+        
+
+
+    def update_next_node(self):
+        current_lane_index = self.observer_vehicle.lane_index
+        if current_lane_index == self.goal_lane_index:
+            self.node = -1
+            return
+        
+        node = self.getNextNode(current_lane_index)
+
+        if node in self.path:
+            self.node = node
+            return
+
+        # We must have deviated off-course
+
+        # try the node at the other side of the lane (we would be in the right lane but facing the wrong way)
+        if node == current_lane_index[0]:
+            other_node = current_lane_index[1]
+        else:
+            other_node = current_lane_index[0]
+
+        if other_node in self.path:
+            self.node = other_node
+            return
+        
+        # Our detected lane is not listed on our route, but that does not necessarily mean we off-course if we are close enough to the proper routes
+        waypoint = self.get_waypoint()
+        dist = np.linalg.norm(self.observer_vehicle.position - waypoint)
+        if dist < NavigationObservation.waypoint_memory_distance_threshold:
+            return
+
+
+        # Finding new path
+        self.cached_paths.append(self.path)
+        for cached_path in self.cached_paths[:-1]:
+            if node in cached_path:
+                self.path = cached_path
+                self.node = node
+                return
+
+        
+        # Computing new paths until we find one that includes our local lane
+        generator_dead = False
+        while True:
+            try:
+                path = next(self.path_generator)
+            except StopIteration:
+                geneartor_dead = True
+                break
+            if node in path:
+                break
+            self.cached_paths.append(path)
+
+        print("number of cached paths:", len(self.cached_paths))
+        if generator_dead:
+            self.create_path_generator()
+            self.node = self.path[0]
+        else:
+            self.path = path
+            self.node = node
+
+
+
+
+            
+
+
+
+class RelativeGoalObservation(ObservationType):
+    """
+    Observe the ego vehicle's state relative to its goal landmark.
+
+    
+ 
+    The observation is a flat vector of 4 values:
+        [dx_body, dy_body, cos(delta_h), sin(delta_h)]
+    
+    where:
+        - (dx_body, dy_body) is the world-frame position offset (goal - ego),
+          rotated into the ego vehicle's body frame. This means dx_body is
+          "how far ahead/behind the goal is along my current heading" and
+          dy_body is "how far left/right". The agent never needs to know its
+          absolute heading to interpret these values.
+ 
+        - cos(delta_h), sin(delta_h) encode the heading error
+          (goal_heading - ego_heading) as a unit vector, which correctly
+          handles angular wraparound with no discontinuity.
+ 
+    In this way, only the relative geometry matters.
+    
+    REQUIRED: observer_vehicle must have a .goal attribute (a RoadObject with .position and .heading)
+    """
+ 
+    OBS_SIZE = 4  # [dx_body, dy_body, cos_dh, sin_dh]
+ 
+    def __init__(
+        self,
+        env: AbstractEnv,
+        normalize: bool = True,
+        position_scale: float = 100.0,
+        **kwargs,
+    ) -> None:
+        """
+        :param env: the environment
+        :param normalize: if True, divide positional offsets by position_scale
+        :param position_scale: normalization divisor for dx_body and dy_body [m]
+        """
+        super().__init__(env)
+        self.normalize = normalize
+        self.position_scale = position_scale
+ 
+    def space(self) -> spaces.Space:
+        return spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(self.OBS_SIZE,),
+            dtype=np.float32,
+        )
+ 
+    def observe(self) -> np.ndarray:
+        ego = self.observer_vehicle
+ 
+        if ego is None or not hasattr(ego, "goal") or ego.goal is None:
+            return np.zeros(self.OBS_SIZE, dtype=np.float32)
+ 
+        goal = ego.goal
+ 
+        # --- Position offset in ego body frame ---
+        # World-frame offset vector
+        world_offset = goal.position - ego.position  # shape (2,)
+ 
+        # Rotation matrix: world -> ego body frame
+        # Rotates a world vector by -ego.heading (i.e. express it in ego's axes)
+        c, s = np.cos(ego.heading), np.sin(ego.heading)
+        # R maps world frame to body frame: [forward, left]
+        R = np.array([[c, s],
+                      [-s, c]])
+        body_offset = R @ world_offset  # [dx_body (forward), dy_body (left)]
+ 
+        if self.normalize:
+            body_offset = body_offset / self.position_scale
+ 
+        # --- Heading error as (cos, sin) ---
+        delta_h = goal.heading - ego.heading
+        cos_dh = np.cos(delta_h)
+        sin_dh = np.sin(delta_h)
+ 
+        obs = np.array(
+            [body_offset[0], body_offset[1], cos_dh, sin_dh],
+            dtype=np.float32,
+        )
+        return obs
 
 
 
@@ -894,5 +1145,7 @@ def observation_factory(env: AbstractEnv, config: dict) -> ObservationType:
         return LaneLidarObservation(env, **config)
     elif config["type"] == "ExitObservation":
         return ExitObservation(env, **config)
+    elif config["type"] == "NavigationObservation":
+        return NavigationObservation(env, **config)
     else:
         raise ValueError("Unknown observation type")

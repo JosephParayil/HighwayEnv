@@ -23,8 +23,16 @@ class RoadNetwork:
 
     def __init__(self):
         self.graph = {}
+        self.grid_to_lanes = None
+        self.partition_gridsize = None
 
-    def add_lane(self, _from: str, _to: str, lane: AbstractLane) -> None:
+        self.reversed_lane_indices = []
+
+    def hash(self, grid_to_lane_indices, partition_gridsize):
+        self.grid_to_lanes = grid_to_lane_indices
+        self.partition_gridsize = partition_gridsize
+
+    def add_lane(self, _from: str, _to: str, lane: AbstractLane, bidirectional = False) -> LaneIndex:
         """
         A lane is encoded as an edge in the road network.
 
@@ -37,7 +45,17 @@ class RoadNetwork:
         if _to not in self.graph[_from]:
             self.graph[_from][_to] = []
         self.graph[_from][_to].append(lane)
+        
+        if bidirectional: # We add an extra reference to the same lane
+            if _to not in self.graph:
+                self.graph[_to] = {}
+            if _from not in self.graph[_to]:
+                self.graph[_to][_from] = []
+            self.graph[_to][_from].append(lane)
+            self.reversed_lane_indices.append((_to, _from, len(self.graph[_to][_from])-1))
 
+        return (_from, _to, len(self.graph[_from][_to])-1)
+    
     def get_lane(self, index: LaneIndex) -> AbstractLane:
         """
         Get the lane geometry corresponding to a given index in the road network.
@@ -51,6 +69,9 @@ class RoadNetwork:
         if _id is None and len(self.graph[_from][_to]) == 1:
             _id = 0
         return self.graph[_from][_to][_id]
+
+        
+
 
     def get_closest_lane_index(
         self, position: np.ndarray, heading: float | None = None
@@ -366,7 +387,7 @@ class RoadNetwork:
         _to = np_random.choice(list(self.graph[_from].keys()))
         _id = np_random.integers(len(self.graph[_from][_to]))
         return _from, _to, _id
-
+    
     @classmethod
     def from_config(cls, config: dict) -> None:
         net = cls()
@@ -399,7 +420,7 @@ class Road:
         road_objects: list[objects.RoadObject] = None,
         np_random: np.random.RandomState = None,
         record_history: bool = False,
-        record_vehicle_lane: bool = True
+        record_vehicle_lane: bool = True #warning: if this is set to False, lane-following controller vehicles will be defunct
     ) -> None: 
         """
         New road.
@@ -409,6 +430,7 @@ class Road:
         :param road_objects: the objects on the road including obstacles and landmarks
         :param np.random.RandomState np_random: a random number generator for vehicle behaviour
         :param record_history: whether the recent trajectories of vehicles should be recorded for display
+        :param record_vehicle_lane: enables/disables the tracking of which lane a vehicle belongs to.
         """
         self.network = network
         self.vehicles = vehicles or []

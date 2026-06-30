@@ -65,26 +65,44 @@ def draw_line(surface, camera, color, wx1, wy1, wx2, wy2, width=1):
 
 # --- Generation Parameters -------------------------
 
-# Lane width
-lane_width = 10
+params = {
+    'target_num_endpoints': 300, 
+    'forward_speed': 10,
+    'age_of_maturity': 4,
+    'lane_width': 10,
+    'perlin_variation_params': {
+        'jitteriness': {
+            'x': random.randint(0,10000),
+            'y': random.randint(0,10000),
+            'upper': 0.25,
+            'lower': 0.1
+        },
+        'max_turn_speed': {
+            'x': random.randint(0,10000),
+            'y': random.randint(0,10000),
+            'upper': 0.01,
+            'lower': 0.01
+        },
+        'replication_chance': {
+            'x': random.randint(0,10000),
+            'y': random.randint(0,10000),
+            'upper': 0.7,
+            'lower': 0.0
+        },
+        'spontaneous_death_chance': {
+            'x': random.randint(0,10000),
+            'y': random.randint(0,10000),
+            'upper': 0.0,
+            'lower': 0.0
+        }
+    }
+}
 
-# World
-target_num_endpoints = 1000
+merge_radius = params['forward_speed'] * 2
+prevent_replication_radius = params['age_of_maturity'] * params['forward_speed']
 
-# Movement
-forward_speed = lane_width
-
-# Proximity & Time
-merge_radius = 2*forward_speed
-age_of_maturity = 4
-prevent_replication_radius = age_of_maturity * forward_speed
-
-
-# Twist Optimization
-twist_iterations = 4*forward_speed
-twist_step = 0.0002/forward_speed
-
-
+twist_iterations = 2*params['forward_speed']
+twist_step = 0.0002/params['forward_speed']
 
 # --- Visual constants -------------------------------------------------
 
@@ -101,6 +119,8 @@ LANE_COLORS       = {
 NODE_COLOR        = (255, 200,  60)   # node label text
 NODE_BG_COLOR     = (30,  30,  30)    # small background pill behind label
 NODE_RADIUS_COLOR = (60, 120, 180)    # thin merge-radius circle
+CENTER_POINTS_COLOR = (255, 0, 0)
+JUNCTION_POINT_COLOR = (0, 255, 0)
 MERGE_RADIUS      = merge_radius                # must match generator value
 DRAW_MERGE_RADII = False
 DRAW_ENDPOINTS = True
@@ -150,7 +170,7 @@ def draw_lanes(surface, camera, lanes, node_font, stage):
     # --- Pass 1: road polylines ---
     sides = ['left_points', 'right_points']
     for lane in lanes:
-        if stage <= 7:
+        if stage <= 8:
             pts = lane['points']
             screen_pts = [camera.world_to_screen(x, y) for x, y in pts]
             width = max(1, int(5 * camera.zoom))
@@ -164,6 +184,7 @@ def draw_lanes(surface, camera, lanes, node_font, stage):
                 screen_pts = [camera.world_to_screen(x, y) for x, y in pts]
                 width = max(1, int(1 * camera.zoom))
                 pygame.draw.lines(surface, LANE_COLORS[side], False, screen_pts, width)
+
     
     if DRAW_MERGE_RADII:
         # --- Pass 2: merge-radius circles at every node ---
@@ -202,11 +223,21 @@ def draw_lanes(surface, camera, lanes, node_font, stage):
             surface.blit(text_surf, (sx - tw // 2, sy - th // 2))
 
 
-def draw_interest_points(points, surface, camera):
+def draw_interest_points(lanes, points, junction_to_pos, surface, camera):
+    r = 2
     for point in points:
         sx, sy = camera.world_to_screen(point[0], point[1])
-        r = 2
+
         pygame.draw.circle(surface, (255,0,0), (sx, sy), r, 0)
+    
+    for lane in lanes:
+        for point in lane['points']:
+            sx, sy = camera.world_to_screen(point[0], point[1])
+            pygame.draw.circle(surface, CENTER_POINTS_COLOR, (sx, sy), r, 0)
+    
+    for point in junction_to_pos.values():
+        sx, sy = camera.world_to_screen(point[0], point[1])
+        pygame.draw.circle(surface, JUNCTION_POINT_COLOR, (sx, sy), r, 0)
 
 def draw_hud(surface, font, camera):
     lines = [
@@ -246,7 +277,7 @@ def main():
         print("Loading road network")
 
         with open (sys.argv[1], 'r') as f:
-            lanes = json.load(f)
+            lanes = unserialize_lanes(json.load(f))
 
     else:
         print("Generating road network...")
@@ -255,12 +286,18 @@ def main():
         #    forward_speed = forward_speed, jitteriness = jitteriness, max_turn_speed = max_turn_speed,
         #    replication_chance = replication_chance, spontaneous_death_chance = spontaneous_death_chance,
         #    merge_radius = merge_radius, prevent_replication_radius = prevent_replication_radius, age_of_maturity = age_of_maturity)
-        lanes = generate_rough_map(target_num_endpoints=target_num_endpoints, forward_speed=forward_speed, 
-                                   merge_radius = merge_radius, prevent_replication_radius = prevent_replication_radius, age_of_maturity = age_of_maturity)
+        lanes = generate_rough_map(
+            target_num_endpoints = max(2, params['target_num_endpoints']),
+            forward_speed = params['forward_speed'],
+            merge_radius = merge_radius,
+            prevent_replication_radius=prevent_replication_radius,
+            age_of_maturity = params['age_of_maturity'],
+            perlin_variation_params = params['perlin_variation_params']
+        )
 
 
         with open ('data.json', 'w') as f:
-            json.dump(lanes, f)
+            json.dump(serialize_lanes(lanes), f)
     
     stage = 1
         
@@ -320,32 +357,59 @@ def main():
                             rectify_short_lanes(lanes)
                         case 2:
                             conjoined_nodes = combine_nodes(lanes, merge_radius, mark = True)
-                            split_lanes(lanes, conjoined_nodes, merge_radius = merge_radius, forward_speed = forward_speed)
+                            split_lanes(lanes, conjoined_nodes, merge_radius = merge_radius, forward_speed = params['forward_speed'])
                         case 3:
                             rectify_short_lanes(lanes)
                         case 4:
                             combine_nodes(lanes, merge_radius)
                         case 5:
                             remove_identical_reference_lanes(lanes)
-                            #lanes = rectify_map(lanes, merge_radius = merge_radius, age_of_maturity=age_of_maturity)
                         case 6:
-                            nodeset = twist_optimize(lanes, iterations = twist_iterations, step = twist_step, lane_width = lane_width)
+                            prune_intersecting_lanes(lanes)
                         case 7:
-                            generate_lane_boundaries(lanes, lane_width)
+                            twist_optimize(lanes, iterations = twist_iterations, step = twist_step, lane_width = params['lane_width'])
+                            nodeset = get_nodeset(lanes)
                         case 8: 
+                            generate_lane_boundaries(lanes, params['lane_width'])
+                            
+                        case 9:
                             for node in nodeset:
                                 correct_junction_boundaries(lanes, node)
-                        case 9:
-                            lane_to_grid, grid_to_lanes = lanes_spatial_hash(lanes, gridsize = 50)
-                            #print(lane_to_grid, grid_to_lanes)
+                                seal_dead_end(lanes, node)
+
+
+                     
                         case 10:
+                            lane_to_grid, grid_to_lanes = lanes_spatial_hash(lanes, gridsize = params['lane_width']*2)
                             intersecting_points = get_all_intersection_points(lanes, lane_to_grid, grid_to_lanes)
-                            pprint.pprint(intersecting_points)
+
+                            junction_to_pos = dict()
+                            for node in nodeset:
+                                junction_to_pos[node] = getJunctionPos(lanes, node)
+
+                        case 11:
+                             # Lane network correction loop
+
+                            invalids = get_invalid_lanes(lanes, params['forward_speed'])
+
+
+                            for lane in invalids:
+                                print(f"\tLane from {lane['start']} to {lane['end']} is invalid")
+                                
+                            kil(lanes, invalids)
+
+                        case 12:
+                            remove_disjoint_clusters(lanes)
+                            nodeset = get_nodeset(lanes)
+                            junction_to_pos = dict()
+                            for node in nodeset:
+                                junction_to_pos[node] = getJunctionPos(lanes, node)
                         case _:
                             for lane in lanes:
                                 pprint.pprint(lane["left_points"])
                                 pprint.pprint(lane["right_points"])
                             continue
+                        
                     stage += 1
                    
                 
@@ -395,8 +459,8 @@ def main():
         draw_grid(screen, camera, spacing=50)
         draw_lanes(screen, camera, lanes, node_font, stage)
         draw_hud(screen, hud_font, camera)
-        if stage > 10:
-            draw_interest_points(intersecting_points, screen, camera)
+        if stage >= 11:
+            draw_interest_points(lanes, intersecting_points, junction_to_pos, screen, camera)
         pygame.display.flip()
 
     pygame.quit()

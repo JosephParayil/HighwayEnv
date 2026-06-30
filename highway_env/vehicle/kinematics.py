@@ -169,11 +169,11 @@ class Vehicle(RoadObject):
 
     def on_state_update(self) -> None:
         if self.road:
-            if self.road.record_vehicle_lane:
+            if True:#self.road.record_vehicle_lane:
                 self.lane_index = self.road.network.get_closest_lane_index(
                     self.position, self.heading
                 )
-            #self.lane = self.road.network.get_lane(self.lane_index)
+                self.lane = self.road.network.get_lane(self.lane_index)
             if self.road.record_history:
                 self.history.appendleft(self.create_from(self))
 
@@ -228,7 +228,7 @@ class Vehicle(RoadObject):
 
     @property
     def lane_offset(self) -> np.ndarray:
-        if self.road.record_vehicle_lane and self.lane is not None:
+        if self.lane is not None:# and self.road.record_vehicle_lane:
             long, lat = self.lane.local_coordinates(self.position)
             ang = self.lane.local_angle(self.heading, long)
             return np.array([long, lat, ang])
