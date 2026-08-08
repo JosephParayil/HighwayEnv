@@ -13,6 +13,8 @@ Generates arbitrary road networks of any size defined by the raw boundary points
 ## Use
 
 ```python
+import numpy as np
+
 from highway_env.road.generation.generator import (
     generate_random_lanes, default_params
 )
@@ -21,14 +23,14 @@ from highway_env.road.partitioned_road import PartitionedRoadNetwork
 from highway_env.road.road import LineType, Road
 
 generation_params = default_params()
-lanes = generate_random_lanes(generation_params)
+lanes = generate_random_lanes(rng = np.random.default_rng(), provided_params = generation_params)
 
 ## inside env._make_road():
 
 # We now have a list of Lane that contains the raw geometrical boundary points
 # of our road network + the nodes each lane connects to.
 # We must now construct our RoadNetwork from this
-net = PartitionedRoadNetwork(partition_gridsize=100)
+net = PartitionedRoadNetwork(partition_gridsize=30)
 for lane in lanes:
     real_lane = PolyLane(
         lane_points=lane.points,

@@ -71,7 +71,7 @@ env.reset(options = {'config': config})
 
 | ID | Description |
 |---|---|
-| `u-turn-v0` | Initial version. Single-agent only.|
+| `random-road-v0` | Initial version. Single-agent only.|
 
 ## Default configuration
 
@@ -100,7 +100,7 @@ env.reset(options = {'config': config})
     "parking_seed": 0,
     "generation_params": None,
     "preloaded_lanes": None,
-    "lane_partition_gridsize": 100,
+    "lane_partition_gridsize": 30,
 }
 ```
 
