@@ -47,3 +47,28 @@ def test_obs_grayscale(env_spec, stack_size=4):
         env.config["screen_width"],
         env.config["screen_height"],
     )
+
+
+@pytest.mark.parametrize("cells", [3, 16, 60, 61, 62, 123])
+def test_render_lidar_observation(cells):
+    """Rendering a lidar observation draws one sector per cell.
+
+    Before v1.12.2, the angles were calculated by accumulating a float step,
+    which for some cell counts would produced one angle too many and the drawing
+    logic then result in an IndexError.
+    """
+    env = gym.make(
+        "highway-v0",
+        render_mode="rgb_array",
+        config={"observation": {"type": "LidarObservation", "cells": cells}},
+    ).unwrapped
+    env.reset(seed=0)
+    img = env.render()
+    env.close()
+
+    assert isinstance(img, np.ndarray)
+    assert img.shape == (
+        env.config["screen_height"],
+        env.config["screen_width"],
+        3,
+    )

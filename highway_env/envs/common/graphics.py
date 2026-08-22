@@ -264,12 +264,9 @@ class ObservationGraphics:
 
     @classmethod
     def display_grid(cls, lidar_observation, surface):
+        cells = lidar_observation.grid.shape[0]
         psi = np.repeat(
-            np.arange(
-                -lidar_observation.angle / 2,
-                2 * np.pi - lidar_observation.angle / 2,
-                2 * np.pi / lidar_observation.grid.shape[0],
-            ),
+            -lidar_observation.angle / 2 + lidar_observation.angle * np.arange(cells),
             2,
         )
         psi = np.hstack((psi[1:], [psi[0]]))
