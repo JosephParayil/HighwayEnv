@@ -1058,7 +1058,21 @@
 
 
 
+<div class="viewcode-block" id="LidarObservation">
+<a class="viewcode-back" href="../../../../../observations/#highway_env.envs.common.observation.LidarObservation">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LidarObservation</span><span class="p">(</span><span class="n">ObservationType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Observe nearby vehicles and solid objects by simulating a LiDAR sensor array.</span>
+
+<span class="sd">    This observation type divides the space around the vehicle into angular sectors,</span>
+<span class="sd">    and returns an array with one row per angular sector and two columns:</span>
+<span class="sd">    - distance to the nearest collidable object (vehicles or obstacles)</span>
+<span class="sd">    - component of the objects&#39;s relative velocity along that direction</span>
+
+<span class="sd">    The angular sector of index 0 corresponds to an angle 0 (east), and then each</span>
+<span class="sd">    index/sector increases the angle (east, south, west, north).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">DISTANCE</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">SPEED</span> <span class="o">=</span> <span class="mi">1</span>
 
@@ -1070,6 +1084,12 @@
         <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param env: The environment to observe</span>
+<span class="sd">        :param cells: Number of angular sectors</span>
+<span class="sd">        :param maximum_range: Maximum sensor range</span>
+<span class="sd">        :param normalize: Divide distance and relative speed by ``maximum_range``</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cells</span> <span class="o">=</span> <span class="n">cells</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">maximum_range</span> <span class="o">=</span> <span class="n">maximum_range</span>
@@ -1078,17 +1098,23 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">grid</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">origin</span> <span class="o">=</span> <span class="kc">None</span>
 
+<div class="viewcode-block" id="LidarObservation.space">
+<a class="viewcode-back" href="../../../../../observations/#highway_env.envs.common.observation.LidarObservation.space">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">space</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">spaces</span><span class="o">.</span><span class="n">Space</span><span class="p">:</span>
         <span class="n">high</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">maximum_range</span>
-        <span class="k">return</span> <span class="n">spaces</span><span class="o">.</span><span class="n">Box</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">low</span><span class="o">=-</span><span class="n">high</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">high</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">spaces</span><span class="o">.</span><span class="n">Box</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">low</span><span class="o">=-</span><span class="n">high</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">high</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span></div>
 
+
+<div class="viewcode-block" id="LidarObservation.observe">
+<a class="viewcode-back" href="../../../../../observations/#highway_env.envs.common.observation.LidarObservation.observe">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">observe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
         <span class="n">obs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">observer_vehicle</span><span class="o">.</span><span class="n">position</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">observer_vehicle</span><span class="o">.</span><span class="n">velocity</span>
         <span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">:</span>
             <span class="n">obs</span> <span class="o">/=</span> <span class="bp">self</span><span class="o">.</span><span class="n">maximum_range</span>
-        <span class="k">return</span> <span class="n">obs</span>
+        <span class="k">return</span> <span class="n">obs</span></div>
+
 
     <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">origin_velocity</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">origin</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -1149,7 +1175,8 @@
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">angle</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">))</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">index_to_direction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">index</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">index</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">index</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">index</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">)])</span></div>
+
 
 
 <div class="viewcode-block" id="LaneLidarObservation">

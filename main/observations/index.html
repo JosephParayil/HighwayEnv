@@ -592,25 +592,25 @@ vehicle and 0 for placeholders.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-none notranslate"><div class="highlight"><pre><span></span>[[ 1.          1.          0.12        1.          0.          1.
+<div class="output stream highlight-none notranslate"><div class="highlight"><pre><span></span>[[ 1.          1.          0.          1.          0.          1.
    0.        ]
- [ 1.          0.19982782  0.         -0.17135125  0.          1.
+ [ 1.          0.20058236  0.08       -0.19270033  0.          1.
    0.        ]
- [ 1.          0.38606673  0.         -0.19528243  0.          1.
+ [ 1.          0.401642    0.08       -0.18555886  0.          1.
    0.        ]
- [ 1.          0.58658296 -0.12       -0.10226681  0.          1.
+ [ 1.          0.5940082   0.         -0.09703703  0.          1.
    0.        ]
- [ 1.          0.7995101  -0.12       -0.18726513  0.          1.
+ [ 1.          0.79812676  0.04       -0.1903229   0.          1.
    0.        ]
- [ 1.          1.         -0.12       -0.14563806  0.          1.
+ [ 1.          0.99384105  0.08       -0.13815004  0.          1.
    0.        ]
- [ 1.          1.         -0.04       -0.09753402  0.          1.
+ [ 1.          1.          0.04       -0.05393535  0.          1.
    0.        ]
- [ 1.          1.         -0.04       -0.05993814  0.          1.
+ [ 1.          1.          0.04       -0.12341399  0.          1.
    0.        ]
- [ 1.          1.         -0.12       -0.06640769  0.          1.
+ [ 1.          1.          0.12       -0.06171949  0.          1.
    0.        ]
- [ 1.          1.         -0.12       -0.09756294  0.          1.
+ [ 1.          1.          0.12       -0.136428    0.          1.
    0.        ]
  [ 0.          0.          0.          0.          0.          0.
    0.        ]
@@ -926,7 +926,7 @@ These predictions are performed for <span class="math notranslate nohighlight">\
 </section>
 <section id="lidar">
 <h2>Lidar<a class="headerlink" href="#lidar" title="Link to this heading">¶</a></h2>
-<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">LidarObservation</span></code> divides the space around the vehicle into angular sectors, and returns an array with one row per angular sector and two columns:</p>
+<p>The <a class="reference internal" href="#highway_env.envs.common.observation.LidarObservation" title="highway_env.envs.common.observation.LidarObservation"><code class="xref py py-class docutils literal notranslate"><span class="pre">LidarObservation</span></code></a> divides the space around the vehicle into angular sectors, and returns an array with one row per angular sector and two columns:</p>
 <ul class="simple">
 <li><p>distance to the nearest collidable object (vehicles or obstacles)</p></li>
 <li><p>component of the objects’s relative velocity along that direction</p></li>
@@ -1321,12 +1321,56 @@ at the center of the cell is onroad/offroad. This approach is faster if the grid
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="highway_env.envs.common.observation.LidarObservation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">highway_env.envs.common.observation.</span></span><span class="sig-name descname"><span class="pre">LidarObservation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">env</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">16</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maximum_range</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">60</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/highway_env/envs/common/observation/#LidarObservation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.common.observation.LidarObservation" title="Link to this definition">¶</a></dt>
+<dd><p>Observe nearby vehicles and solid objects by simulating a LiDAR sensor array.</p>
+<p>This observation type divides the space around the vehicle into angular sectors,
+and returns an array with one row per angular sector and two columns:
+- distance to the nearest collidable object (vehicles or obstacles)
+- component of the objects’s relative velocity along that direction</p>
+<p>The angular sector of index 0 corresponds to an angle 0 (east), and then each
+index/sector increases the angle (east, south, west, north).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>env</strong> – The environment to observe</p></li>
+<li><p><strong>cells</strong> – Number of angular sectors</p></li>
+<li><p><strong>maximum_range</strong> – Maximum sensor range</p></li>
+<li><p><strong>normalize</strong> – Divide distance and relative speed by <code class="docutils literal notranslate"><span class="pre">maximum_range</span></code></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="highway_env.envs.common.observation.LidarObservation.space">
+<span class="sig-name descname"><span class="pre">space</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Space</span></span></span><a class="reference internal" href="../_modules/highway_env/envs/common/observation/#LidarObservation.space"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.common.observation.LidarObservation.space" title="Link to this definition">¶</a></dt>
+<dd><p>Get the observation space.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="highway_env.envs.common.observation.LidarObservation.observe">
+<span class="sig-name descname"><span class="pre">observe</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../_modules/highway_env/envs/common/observation/#LidarObservation.observe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.common.observation.LidarObservation.observe" title="Link to this definition">¶</a></dt>
+<dd><p>Get an observation of the environment state.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="highway_env.envs.common.observation.LaneLidarObservation">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">highway_env.envs.common.observation.</span></span><span class="sig-name descname"><span class="pre">LaneLidarObservation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">env</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">16</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maximum_range</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">60</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/highway_env/envs/common/observation/#LaneLidarObservation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.common.observation.LaneLidarObservation" title="Link to this definition">¶</a></dt>
 <dd><p>Allows the agent to directly observe the surrounding lane borders
 as if they were walls.</p>
 <p>Requires a PartitionedRoadNetwork.
 Ignores non-PolyLanes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>env</strong> – The environment to observe</p></li>
+<li><p><strong>cells</strong> – Number of angular sectors</p></li>
+<li><p><strong>maximum_range</strong> – Maximum sensor range</p></li>
+<li><p><strong>normalize</strong> – Divide distance and relative speed by <code class="docutils literal notranslate"><span class="pre">maximum_range</span></code></p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="highway_env.envs.common.observation.LaneLidarObservation.trace">
 <span class="sig-name descname"><span class="pre">trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">origin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin_velocity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../_modules/highway_env/envs/common/observation/#LaneLidarObservation.trace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.common.observation.LaneLidarObservation.trace" title="Link to this definition">¶</a></dt>
@@ -1537,6 +1581,11 @@ relative to the agent’s own position and heading.</p>
 </li>
 <li><a class="reference internal" href="#highway_env.envs.common.observation.ExitObservation"><code class="docutils literal notranslate"><span class="pre">ExitObservation</span></code></a><ul>
 <li><a class="reference internal" href="#highway_env.envs.common.observation.ExitObservation.observe"><code class="docutils literal notranslate"><span class="pre">ExitObservation.observe()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#highway_env.envs.common.observation.LidarObservation"><code class="docutils literal notranslate"><span class="pre">LidarObservation</span></code></a><ul>
+<li><a class="reference internal" href="#highway_env.envs.common.observation.LidarObservation.space"><code class="docutils literal notranslate"><span class="pre">LidarObservation.space()</span></code></a></li>
+<li><a class="reference internal" href="#highway_env.envs.common.observation.LidarObservation.observe"><code class="docutils literal notranslate"><span class="pre">LidarObservation.observe()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#highway_env.envs.common.observation.LaneLidarObservation"><code class="docutils literal notranslate"><span class="pre">LaneLidarObservation</span></code></a><ul>
