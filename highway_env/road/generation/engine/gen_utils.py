@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
 from typing import ClassVar
-
 import numpy as np
-from tqdm import tqdm as _tqdm
+
+try:
+    from tqdm import tqdm as _tqdm
+except ImportError:
+    _tqdm = None
 
 
 # Lane Graph Helpers ----------------------------------------
@@ -245,21 +248,24 @@ def find_line_intersection(
 
 def tqdm(iterable=None, disabled=False, *args, **kwargs):
     """
-    Wrapper to optionally disable the display of tqdm in the console
+    Wrapper around tqdm, a no-op passthrough when tqdm is unavailable or disabled.
+
+    :param iterable: optional iterable to wrap with a progress bar
+    :param disabled: if True, skip the progress bar even when tqdm is installed
+    :return: a tqdm progress bar, the original iterable, or a dummy pbar
     """
-    if not disabled:
+    if _tqdm is not None and not disabled:
         return _tqdm(iterable, *args, **kwargs)
-    elif iterable is not None:
+    if iterable is not None:
         return iterable
-    else:
-        return _DummyPbar()
+    return _DummyPbar()
 
 
 class _DummyPbar:
     def __init__(self, *args, **kwargs):
         self.n = 0
 
-    def update(self, n=1):
+    def update(self, n: int | float | None = 1):
         self.n += n
 
     def refresh(self):
