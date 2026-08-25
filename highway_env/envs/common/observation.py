@@ -684,6 +684,18 @@ class ExitObservation(KinematicObservation):
 
 
 class LidarObservation(ObservationType):
+    """
+    Observe nearby vehicles and solid objects by simulating a LiDAR sensor array.
+
+    This observation type divides the space around the vehicle into angular sectors,
+    and returns an array with one row per angular sector and two columns:
+    - distance to the nearest collidable object (vehicles or obstacles)
+    - component of the objects's relative velocity along that direction
+
+    The angular sector of index 0 corresponds to an angle 0 (east), and then each
+    index/sector increases the angle (east, south, west, north).
+    """
+
     DISTANCE = 0
     SPEED = 1
 
@@ -695,6 +707,12 @@ class LidarObservation(ObservationType):
         normalize: bool = True,
         **kwargs,
     ):
+        """
+        :param env: The environment to observe
+        :param cells: Number of angular sectors
+        :param maximum_range: Maximum sensor range
+        :param normalize: Divide distance and relative speed by ``maximum_range``
+        """
         super().__init__(env, **kwargs)
         self.cells = cells
         self.maximum_range = maximum_range
