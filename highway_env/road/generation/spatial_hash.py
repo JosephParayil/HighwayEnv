@@ -1,5 +1,6 @@
 from collections import defaultdict
 from itertools import chain
+from typing import Sequence
 
 import numpy as np
 
@@ -80,7 +81,7 @@ gridhash_offsets = [
 
 
 def get_proximal_lanes_wrt_gridpoint(
-    grid_to_lanes: defaultdict[set], gridpoint: int, extended: bool = False
+    grid_to_lanes: defaultdict[set], gridpoint: Sequence[int], extended: bool = False
 ) -> set:
     """
     :param grid_to_lanes: map from gridpoints to the indices of lanes that inhabit them

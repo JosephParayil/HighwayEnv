@@ -1,4 +1,5 @@
 from itertools import chain
+from typing import cast
 
 import numpy as np
 
@@ -35,6 +36,13 @@ class RandomRoadEnv(AbstractEnv):
     as soon as possible without crashing into a curb or
     other vehicle.
     """
+
+    def __init__(
+        self, config: dict | None = None, render_mode: str | None = None
+    ) -> None:
+        super().__init__(config=config, render_mode=render_mode)
+        self.lanes = []
+        self.vehicle_parked = False
 
     @classmethod
     def default_config(cls) -> dict:
@@ -96,6 +104,7 @@ class RandomRoadEnv(AbstractEnv):
 
     def _reset(self) -> None:
         self.lanes = self._make_road()
+        assert self.road is not None
 
         parking_rng = np.random.default_rng(self.config["parking_seed"])
         self.create_parking_spots(
@@ -110,7 +119,7 @@ class RandomRoadEnv(AbstractEnv):
 
         self.road.vehicles.append(self.vehicle)
 
-        self.vehicle.parked = False
+        self.vehicle_parked = False
 
     def _reward(self, action: Action) -> float:
         """
@@ -146,7 +155,7 @@ class RandomRoadEnv(AbstractEnv):
         # Parking
         parking_score = self.compute_parking_score()
         if parking_score < self.config["parking_score_threshold"]:
-            self.vehicle.parked = True
+            self.vehicle_parked = True
             return self.config["parking_reward"]
 
         # Route-following
@@ -179,14 +188,14 @@ class RandomRoadEnv(AbstractEnv):
         """
         Termination occurs either by collision or by successfully parking
         """
-        return self.vehicle.parked or self.vehicle.crashed
+        return self.vehicle_parked or self.vehicle.crashed
 
     def _is_truncated(self) -> bool:
         return self.time > self.config["max_timesteps"]
 
     def _info(self, obs: Observation, action: Action | None = None) -> dict:
         info = super()._info(obs, action)
-        info["parked"] = self.vehicle.parked
+        info["parked"] = self.vehicle_parked
         return info
 
     def compute_parking_score(self, p: float = 0.5) -> float:
@@ -260,14 +269,17 @@ class RandomRoadEnv(AbstractEnv):
         :return: whether or not there was enough space to generate
             the specified number of spots
         """
+        assert self.road is not None
         curb_spot_offset = 0.1
         # segment_index: {laneID, side, pt_id (1-(len-2))}
         segment_indices = []
 
-        for id, lane in enumerate(self.lanes):
+        for lane_id, lane in enumerate(self.lanes):
             for side in ["left_points", "right_points"]:
                 for pt_id in range(1, len(getattr(lane, side)) - 2):
-                    segment_indices.append({"laneID": id, "side": side, "pt_id": pt_id})
+                    segment_indices.append(
+                        {"laneID": lane_id, "side": side, "pt_id": pt_id}
+                    )
 
         rng.shuffle(segment_indices)
 
@@ -277,11 +289,11 @@ class RandomRoadEnv(AbstractEnv):
             segment_indices
         ):
             segment_index = segment_indices[segment_indices_i]
-            laneID = segment_index["laneID"]
-            side = segment_index["side"]
-            pt_id = segment_index["pt_id"]
+            lane_id = cast(int, segment_index["laneID"])
+            side = cast(str, segment_index["side"])
+            pt_id = cast(int, segment_index["pt_id"])
 
-            lane = self.lanes[laneID]
+            lane = self.lanes[lane_id]
             lane_side = getattr(lane, side)
             pt0 = lane_side[pt_id]
             pt1 = lane_side[pt_id + 1]
@@ -347,9 +359,12 @@ class RandomRoadEnv(AbstractEnv):
             return False
         return True
 
-    def detect_object_lane_collision(self, object: RoadObject) -> bool:
+    def detect_object_lane_collision(self, obj: RoadObject) -> bool:
+        assert self.road is not None and isinstance(
+            self.road.network, PartitionedRoadNetwork
+        )
         gridpoints = set()
-        for pt in object.polygon():
+        for pt in obj.polygon():
             gridpoints.add(point_to_gridpoint(pt, self.road.network.partition_gridsize))
 
         proximal_lanes = set()
@@ -359,7 +374,7 @@ class RandomRoadEnv(AbstractEnv):
             )
 
         for lane_index in proximal_lanes:
-            lane = self.road.network.get_lane(lane_index)
+            lane = cast(PolyLane, self.road.network.get_lane(lane_index))
 
             left_pairs = zip(lane.left_boundary_points, lane.left_boundary_points[1:])
             right_pairs = zip(
@@ -367,7 +382,7 @@ class RandomRoadEnv(AbstractEnv):
             )
 
             for p0, p1 in chain(left_pairs, right_pairs):
-                if object.intersects_with_line(p0, p1):
+                if obj.intersects_with_line(p0, p1):
                     return True
 
         return False

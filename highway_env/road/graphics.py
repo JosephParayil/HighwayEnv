@@ -32,7 +32,7 @@ class WorldSurface(pygame.Surface):
     MOVING_FACTOR = 0.1
 
     def __init__(
-        self, size: tuple[int, int], flags: object, surf: pygame.SurfaceType
+        self, size: tuple[int, int], flags: object, surf: pygame.Surface
     ) -> None:
         super().__init__(size, flags, surf)
         self.origin = np.array([0, 0])
@@ -93,7 +93,7 @@ class WorldSurface(pygame.Surface):
             ]
         )
 
-    def handle_event(self, event: pygame.event.EventType) -> None:
+    def handle_event(self, event: pygame.event.Event) -> None:
         """
         Handle pygame events for moving and zooming in the displayed area.
 
@@ -413,8 +413,8 @@ class RoadObjectGraphics:
 
     @staticmethod
     def blit_rotate(
-        surf: pygame.SurfaceType,
-        image: pygame.SurfaceType,
+        surf: pygame.Surface,
+        image: pygame.Surface,
         pos: Vector,
         angle: float,
         origin_pos: Vector = None,

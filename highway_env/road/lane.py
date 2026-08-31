@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from enum import IntEnum
 
 import numpy as np
 
@@ -147,7 +148,7 @@ class AbstractLane:
         return wrap_to_pi(heading - self.heading_at(long_offset))
 
 
-class LineType:
+class LineType(IntEnum):
     """A lane side line type."""
 
     NONE = 0
@@ -449,9 +450,9 @@ class PolyLane(PolyLaneFixedWidth):
 
     def __init__(
         self,
-        lane_points: list[tuple[float, float]],
-        left_boundary_points: list[tuple[float, float]],
-        right_boundary_points: list[tuple[float, float]],
+        lane_points: list[np.ndarray[(2,), np.floating]],
+        left_boundary_points: list[np.ndarray[(2,), np.floating]],
+        right_boundary_points: list[np.ndarray[(2,), np.floating]],
         line_types: tuple[LineType, LineType] = None,
         forbidden: bool = False,
         speed_limit: float = 20,

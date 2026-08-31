@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections import OrderedDict
 from itertools import chain, product
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ from highway_env.road.generation.spatial_hash import (
 )
 from highway_env.road.lane import AbstractLane, PolyLane
 from highway_env.road.partitioned_road import PartitionedRoadNetwork
-from highway_env.road.road import LaneIndex
+from highway_env.road.road import LaneIndex, Road
 from highway_env.utils import Vector
 from highway_env.vehicle.kinematics import Vehicle
 
@@ -103,7 +103,7 @@ class GrayscaleObservation(ObservationType):
         )
         self.viewer = EnvViewer(env, config=viewer_config)
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Box:
         return spaces.Box(shape=self.shape, low=0, high=255, dtype=np.uint8)
 
     def observe(self) -> np.ndarray:
@@ -121,7 +121,7 @@ class GrayscaleObservation(ObservationType):
 
 
 class TimeToCollisionObservation(ObservationType):
-    def __init__(self, env: AbstractEnv, horizon: int = 10, **kwargs: dict) -> None:
+    def __init__(self, env: AbstractEnv, horizon: int = 10, **kwargs) -> None:
         super().__init__(env)
         self.horizon = horizon
 
@@ -168,9 +168,9 @@ class KinematicObservation(ObservationType):
     def __init__(
         self,
         env: AbstractEnv,
-        features: list[str] = None,
+        features: list[str] | None = None,
         vehicles_count: int = 5,
-        features_range: dict[str, list[float]] = None,
+        features_range: dict[str, list[float]] | None = None,
         absolute: bool = False,
         order: str = "sorted",
         normalize: bool = True,
@@ -178,7 +178,7 @@ class KinematicObservation(ObservationType):
         see_behind: bool = False,
         observe_intentions: bool = False,
         include_obstacles: bool = True,
-        **kwargs: dict,
+        **kwargs,
     ) -> None:
         """
         :param env: The environment to observe
@@ -204,7 +204,7 @@ class KinematicObservation(ObservationType):
         self.observe_intentions = observe_intentions
         self.include_obstacles = include_obstacles
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Box:
         return spaces.Box(
             shape=(self.vehicles_count, len(self.features)),
             low=-np.inf,
@@ -220,6 +220,7 @@ class KinematicObservation(ObservationType):
         :param Dataframe df: observation data
         """
         if not self.features_range:
+            assert self.env.road is not None
             side_lanes = self.env.road.network.all_side_lanes(
                 self.observer_vehicle.lane_index
             )
@@ -297,12 +298,12 @@ class OccupancyGridObservation(ObservationType):
         features: list[str] | None = None,
         grid_size: tuple[tuple[float, float], tuple[float, float]] | None = None,
         grid_step: tuple[float, float] | None = None,
-        features_range: dict[str, list[float]] = None,
+        features_range: dict[str, list[float]] | None = None,
         absolute: bool = False,
         align_to_vehicle_axes: bool = False,
         clip: bool = True,
         as_image: bool = False,
-        **kwargs: dict,
+        **kwargs,
     ) -> None:
         """
         :param env: The environment to observe
@@ -334,7 +335,7 @@ class OccupancyGridObservation(ObservationType):
         self.clip = clip
         self.as_image = as_image
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Box:
         if self.as_image:
             return spaces.Box(shape=self.grid.shape, low=0, high=255, dtype=np.uint8)
         else:
@@ -375,6 +376,7 @@ class OccupancyGridObservation(ObservationType):
             )
             # Normalize
             df = self.normalize(df)
+            assert self.features_range is not None
             # Fill-in features
             for layer, feature in enumerate(self.features):
                 if feature in df.columns:  # A vehicle feature
@@ -472,7 +474,7 @@ class OccupancyGridObservation(ObservationType):
         :param lane_perception_distance: lanes are rendered +/- this distance from vehicle location
         """
         lane_waypoints_spacing = np.amin(self.grid_step)
-        road = self.env.road
+        road = cast(Road, self.env.road)
 
         for _from in road.network.graph.keys():
             for _to in road.network.graph[_from].keys():
@@ -498,7 +500,7 @@ class OccupancyGridObservation(ObservationType):
         In this implementation, we iterate the grid cells and check whether the corresponding world position
         at the center of the cell is onroad/offroad. This approach is faster if the grid is small and the road network large.
         """
-        road = self.env.road
+        road = cast(Road, self.env.road)
         for i, j in product(range(self.grid.shape[-2]), range(self.grid.shape[-1])):
             for _from in road.network.graph.keys():
                 for _to in road.network.graph[_from].keys():
@@ -508,11 +510,11 @@ class OccupancyGridObservation(ObservationType):
 
 
 class KinematicsGoalObservation(KinematicObservation):
-    def __init__(self, env: AbstractEnv, scales: list[float], **kwargs: dict) -> None:
+    def __init__(self, env: AbstractEnv, scales: list[float], **kwargs) -> None:
         self.scales = np.array(scales)
         super().__init__(env, **kwargs)
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Dict[str, spaces.Box]:
         try:
             obs = self.observe()
             return spaces.Dict(
@@ -540,7 +542,7 @@ class KinematicsGoalObservation(KinematicObservation):
         except AttributeError:
             return spaces.Space()
 
-    def observe(self) -> dict[str, np.ndarray]:
+    def observe(self) -> dict[str, np.ndarray]:  # ty: ignore[invalid-method-override]
         if not self.observer_vehicle:
             return OrderedDict(
                 [
@@ -569,7 +571,7 @@ class KinematicsGoalObservation(KinematicObservation):
 
 
 class AttributesObservation(ObservationType):
-    def __init__(self, env: AbstractEnv, attributes: list[str], **kwargs: dict) -> None:
+    def __init__(self, env: AbstractEnv, attributes: list[str], **kwargs) -> None:
         self.env = env
         self.attributes = attributes
 
@@ -603,7 +605,7 @@ class MultiAgentObservation(ObservationType):
             obs_type.observer_vehicle = vehicle
             self.agents_observation_types.append(obs_type)
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Tuple:
         return spaces.Tuple(
             [obs_type.space() for obs_type in self.agents_observation_types]
         )
@@ -624,7 +626,7 @@ class DictObservation(ObservationType):
             for name, obs_config in observation_configs.items()
         }
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Dict:
         return spaces.Dict(
             {
                 name: obs_type.space()
@@ -731,7 +733,7 @@ class LidarObservation(ObservationType):
         self.grid = np.ones((self.cells, 1)) * float("inf")
         self.origin = None
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Box:
         high = 1 if self.normalize else self.maximum_range
         return spaces.Box(shape=(self.cells, 2), low=-high, high=high, dtype=np.float32)
 
@@ -747,6 +749,7 @@ class LidarObservation(ObservationType):
         self.origin = origin.copy()
         self.grid = np.ones((self.cells, 2), dtype=np.float32) * self.maximum_range
 
+        assert self.env.road is not None
         for obstacle in self.env.road.vehicles + self.env.road.objects:
             if obstacle is self.observer_vehicle or not obstacle.solid:
                 continue
@@ -782,7 +785,7 @@ class LidarObservation(ObservationType):
             # Actual distance computation for these sections
             for index in indexes:
                 direction = self.index_to_direction(index)
-                ray = [origin, origin + self.maximum_range * direction]
+                ray = (origin, origin + self.maximum_range * direction)
                 distance = utils.distance_to_rect(ray, corners)
                 if distance <= self.grid[index, self.DISTANCE]:
                     velocity = (obstacle.velocity - origin_velocity).dot(direction)
@@ -834,6 +837,7 @@ class LaneLidarObservation(LidarObservation):
         self.vehicle_heading = self.observer_vehicle.heading
         self.grid = np.ones((self.cells, 2), dtype=np.float32) * self.maximum_range
 
+        assert self.env.road is not None
         if not isinstance(self.env.road.network, PartitionedRoadNetwork):
             print("PartitionedRoadNetwork required for LaneLidarObservation")
             return self.grid
@@ -904,7 +908,7 @@ class LaneLidarObservation(LidarObservation):
     ) -> float:
         closest_distance = self.maximum_range
         for lane_index in lanes_to_check:
-            lane = self.env.road.network.get_lane(lane_index)
+            lane = cast(Road, self.env.road).network.get_lane(lane_index)
             if not isinstance(lane, PolyLane):
                 continue
             left_pairs = zip(lane.left_boundary_points, lane.left_boundary_points[1:])
@@ -937,7 +941,7 @@ class NavigationObservation(ObservationType):
 
     waypoint_offset = 0
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Box:
         low = np.array([0.0, -1.0, -1.0], dtype=np.float32)
         high = np.array([np.inf, 1.0, 1.0], dtype=np.float32)
         return spaces.Box(shape=(3,), low=low, high=high, dtype=np.float32)
@@ -953,6 +957,7 @@ class NavigationObservation(ObservationType):
             or self.observer_vehicle.goal is None
         ):
             return
+        assert self.env.road is not None
         self.goal_pos = self.observer_vehicle.goal.position
         self.goal_lane_index = self.env.road.network.get_closest_lane_index(
             self.goal_pos, 0
@@ -1000,6 +1005,7 @@ class NavigationObservation(ObservationType):
         """
         Computes the shortest path from our start lane to the goal lane
         """
+        assert self.env.road is not None
         start_lane_index = self.observer_vehicle.lane_index
         start_node = self.get_next_node(start_lane_index)
 
@@ -1027,6 +1033,7 @@ class NavigationObservation(ObservationType):
             self.path.append(start_node)
 
     def get_next_node(self, lane_index: LaneIndex) -> str:
+        assert self.env.road is not None
         _from, _to, _ = lane_index
         lane = self.env.road.network.get_lane(lane_index)
 
@@ -1066,6 +1073,7 @@ class NavigationObservation(ObservationType):
             next_node = self.path[index + 1]
             lane_index = (self.node, next_node, 0)
 
+        assert self.env.road is not None
         lane = self.env.road.network.get_lane(lane_index)
 
         if lane_index in self.env.road.network.reversed_lane_indices:
@@ -1148,7 +1156,7 @@ class RelativeGoalObservation(ObservationType):
         self.normalize = normalize
         self.distance_scale = distance_scale
 
-    def space(self) -> spaces.Space:
+    def space(self) -> spaces.Box:
         return spaces.Box(
             low=-np.inf,
             high=np.inf,

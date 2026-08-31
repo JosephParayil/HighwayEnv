@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 
 try:
@@ -184,7 +185,7 @@ def get_nodeset(lanes: list[Lane]):
 
 
 def line_intersection_t(
-    a: np.ndarray, av: np.ndarray, b: np.ndarray, bv: np.ndarray
+    a: np.ndarray | ArrayLike, av: np.ndarray, b: np.ndarray | ArrayLike, bv: np.ndarray
 ) -> tuple[float, float]:
     """
     :param a: point on line A
