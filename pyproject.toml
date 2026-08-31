@@ -42,6 +42,7 @@ testing = [
     "diff-cover",
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "scipy",
 ]
 
@@ -61,6 +62,7 @@ test = [
     "diff-cover",
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "scipy",
 ]
 docs = [
