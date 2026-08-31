@@ -5,8 +5,8 @@ import numpy as np
 from highway_env.envs.common.abstract import AbstractEnv, Observation
 from highway_env.envs.common.action import Action, action_factory
 from highway_env.envs.common.observation import (
+    DictObservation,
     NavigationObservation,
-    TupleObservation,
     observation_factory,
 )
 from highway_env.road.generation.engine.gen_utils import Lane
@@ -61,13 +61,13 @@ class RandomRoadEnv(AbstractEnv):
         config.update(
             {
                 "observation": {
-                    "type": "TupleObservation",
-                    "observation_configs": [
-                        {"type": "LaneLidarObservation"},
-                        {"type": "NavigationObservation"},
-                        {"type": "RelativeGoalObservation"},
-                        {"type": "LidarObservation"},
-                    ],
+                    "type": "DictObservation",
+                    "observation_configs": {
+                        "lane_lidar": {"type": "LaneLidarObservation"},
+                        "navigation": {"type": "NavigationObservation"},
+                        "relative_goal": {"type": "RelativeGoalObservation"},
+                        "lidar": {"type": "LidarObservation"},
+                    },
                 },
                 "action": {"type": "ContinuousAction"},
                 "screen_width": 1200,
@@ -154,8 +154,8 @@ class RandomRoadEnv(AbstractEnv):
 
         if self.config["route_following_reward_scalar"] != 0:
             navigation_observation = None
-            if isinstance(self.observation_type, TupleObservation):
-                for obs in self.observation_type.observation_types:
+            if isinstance(self.observation_type, DictObservation):
+                for obs in self.observation_type.observation_types.values():
                     if isinstance(obs, NavigationObservation):
                         navigation_observation = obs
             elif isinstance(self.observation_type, NavigationObservation):

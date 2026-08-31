@@ -78,13 +78,13 @@ env.reset(options = {'config': config})
 ```python
 {
     "observation": {
-        "type": "TupleObservation",
-        "observation_configs": [
-            {"type": "LaneLidarObservation"},
-            {"type": "NavigationObservation"},
-            {"type": "RelativeGoalObservation"},
-            {"type": "LidarObservation"},
-        ],
+        "type": "DictObservation",
+        "observation_configs": {
+            "lane_lidar": {"type": "LaneLidarObservation"},
+            "navigation": {"type": "NavigationObservation"},
+            "relative_goal": {"type": "RelativeGoalObservation"},
+            "lidar": {"type": "LidarObservation"},
+        },
     },
     "action": {"type": "ContinuousAction"},
     "screen_width": 1200,

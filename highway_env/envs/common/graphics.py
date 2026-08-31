@@ -266,10 +266,10 @@ class ObservationGraphics:
     @classmethod
     def display(cls, obs: ObservationType, sim_surface):
         from highway_env.envs.common.observation import (
+            DictObservation,
             LaneLidarObservation,
             LidarObservation,
             NavigationObservation,
-            TupleObservation,
         )
 
         if isinstance(obs, NavigationObservation):
@@ -278,8 +278,8 @@ class ObservationGraphics:
             cls.display_rays(obs, sim_surface)
         elif isinstance(obs, LidarObservation):
             cls.display_grid(obs, sim_surface)
-        elif isinstance(obs, TupleObservation):
-            for obs_type in obs.observation_types:
+        elif isinstance(obs, DictObservation):
+            for obs_type in obs.observation_types.values():
                 cls.display(obs_type, sim_surface)
 
     @classmethod

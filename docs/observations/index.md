@@ -441,6 +441,26 @@ Requires that the ego-vehicle has a goal attribute
 ```
 
 
+## Dict
+The {py:class}`~highway_env.envs.common.observation.DictObservation` composes several named observation types into a Gymnasium `Dict` space.
+
+The environment then returns a dict of observations with those keys, which is the recommended way to combine heterogeneous sensors (for example lidar plus navigation).
+
+### Example configuration (Dict)
+
+```python
+"observation": {
+    "type": "DictObservation",
+    "observation_configs": {
+        "lane_lidar": {"type": "LaneLidarObservation"},
+        "navigation": {"type": "NavigationObservation"},
+        "relative_goal": {"type": "RelativeGoalObservation"},
+        "lidar": {"type": "LidarObservation"},
+    },
+}
+```
+
+
 ## API
 
 ```{eval-rst}
