@@ -19,6 +19,12 @@ from highway_env.vehicle.graphics import VehicleGraphics
 if TYPE_CHECKING:
     from highway_env.envs import AbstractEnv
     from highway_env.envs.common.abstract import Action
+    from highway_env.envs.common.observation import (
+        LaneLidarObservation,
+        LidarObservation,
+        NavigationObservation,
+        ObservationType,
+    )
 
 
 class EnvViewer:
@@ -258,7 +264,7 @@ class ObservationGraphics:
     NAV_COLOR = (200, 200, 0)  # display_navigation_arrow
 
     @classmethod
-    def display(cls, obs, sim_surface):
+    def display(cls, obs: ObservationType, sim_surface):
         from highway_env.envs.common.observation import (
             LaneLidarObservation,
             LidarObservation,
@@ -277,7 +283,7 @@ class ObservationGraphics:
                 cls.display(obs_type, sim_surface)
 
     @classmethod
-    def display_grid(cls, lidar_observation, surface):
+    def display_grid(cls, lidar_observation: LidarObservation, surface):
         cells = lidar_observation.grid.shape[0]
         psi = np.repeat(
             -lidar_observation.angle / 2 + lidar_observation.angle * np.arange(cells),
@@ -299,7 +305,7 @@ class ObservationGraphics:
         pygame.draw.lines(surface, ObservationGraphics.LIDAR_COLOR, True, points, 1)
 
     @classmethod
-    def display_navigation_arrow(cls, nav_observation, surface):
+    def display_navigation_arrow(cls, nav_observation: NavigationObservation, surface):
         """
         Draws a line that shows the next waypoint
         """
@@ -314,9 +320,12 @@ class ObservationGraphics:
         )
 
     @classmethod
-    def display_rays(cls, lanelidar_observation, surface):
+    def display_rays(cls, lanelidar_observation: LaneLidarObservation, surface):
         for index in range(lanelidar_observation.cells):  # [0]:
-            angle = index * lanelidar_observation.angle + lanelidar_observation.heading
+            angle = (
+                index * lanelidar_observation.angle
+                + lanelidar_observation.vehicle_heading
+            )
             dist = lanelidar_observation.grid[index][0]
             world_x = lanelidar_observation.origin[0] + math.cos(angle) * dist
             world_y = lanelidar_observation.origin[1] + math.sin(angle) * dist
