@@ -4,7 +4,7 @@ import numpy as np
 from noise import pnoise2
 
 from ..spatial_hash import get_proximal_lanes_wrt_gridpoint, point_to_gridpoint
-from .gen_utils import Lane, tqdm
+from .gen_utils import Lane, wrap_with_tqdm
 
 
 def generate_road_network_skeleton(
@@ -48,7 +48,7 @@ def generate_road_network_skeleton(
         agents = [ConstructionAgent(start_location=0)]
         num_locations = 1
         simulation_step = 0
-        with tqdm(
+        with wrap_with_tqdm(
             total=target_num_endpoints,
             disabled=disable_prints,
             desc="Generating road network skeleton",

@@ -13,7 +13,7 @@ from .gen_utils import (
     get_nodeset,
     get_radially_sorted_endpoints,
     line_intersection_t,
-    tqdm,
+    wrap_with_tqdm,
 )
 from .optimize import twist_optimize
 from .rectify import (
@@ -64,5 +64,5 @@ __all__ = [
     "line_intersection_t",
     "do_line_segments_intersect",
     "find_line_intersection",
-    "tqdm",
+    "wrap_with_tqdm",
 ]

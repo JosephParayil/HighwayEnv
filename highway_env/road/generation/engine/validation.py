@@ -18,7 +18,7 @@ from .gen_utils import (
     get_nodeset,
     get_radially_sorted_endpoints,
     line_intersection_t,
-    tqdm,
+    wrap_with_tqdm,
 )
 
 
@@ -42,7 +42,7 @@ def get_invalid_lanes(
     _, grid_to_lanes = lanes_spatial_hash(lanes, gridsize)
 
     invalids = []
-    for lane in tqdm(
+    for lane in wrap_with_tqdm(
         lanes, disabled=disable_prints, desc="Checking lanes for blockages"
     ):
         # Computing the start and end points of our lane
@@ -481,7 +481,7 @@ def get_all_intersection_points(
     """
     intersecting_points = []
     for laneID, lane in enumerate(
-        tqdm(lanes, disabled=disable_prints, desc="Flagging intersection points")
+        wrap_with_tqdm(lanes, disabled=disable_prints, desc="Flagging intersection points")
     ):
         proximal_lanes = get_proximal_lanes_wrt_lane(
             laneID, lane_to_grid, grid_to_lanes

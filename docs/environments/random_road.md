@@ -5,7 +5,7 @@
 ```
 
 # Random Road
-Agent has low-level controls of a car and needs to navigate a procedurally generated road network to a goal parking spot.
+Agent has low-level controls of a car and needs to navigate a procedurally generated road network to a goal (parking spot).
 
 The rules are minimal:
 1. Get to your destination in as little time as possible

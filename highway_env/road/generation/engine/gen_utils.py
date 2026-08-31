@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import ClassVar
+
 import numpy as np
+
 
 try:
     from tqdm import tqdm as _tqdm
@@ -246,7 +248,7 @@ def find_line_intersection(
 # Misc ----------------------------------------
 
 
-def tqdm(iterable=None, disabled=False, *args, **kwargs):
+def wrap_with_tqdm(iterable=None, disabled=False, *args, **kwargs):
     """
     Wrapper around tqdm, a no-op passthrough when tqdm is unavailable or disabled.
 

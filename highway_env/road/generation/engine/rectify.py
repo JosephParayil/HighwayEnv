@@ -8,7 +8,7 @@ from .gen_utils import (
     Lane,
     do_line_segments_intersect,
     line_intersection_t,
-    tqdm,
+    wrap_with_tqdm,
 )
 
 
@@ -102,7 +102,7 @@ def combine_nodes(
         node_power = defaultdict(int)
 
     for laneID, lane in enumerate(
-        tqdm(lanes, disabled=disable_prints, desc="Merging nodes")
+        wrap_with_tqdm(lanes, disabled=disable_prints, desc="Merging nodes")
     ):
         proximal_lanes = get_proximal_lanes_wrt_lane(
             laneID, lane_to_grid, grid_to_lanes, extended=True
@@ -189,7 +189,7 @@ def split_lanes(
     """
     cutoff_length = np.ceil(merge_radius * 2.0 / forward_speed)
 
-    for lane in tqdm(
+    for lane in wrap_with_tqdm(
         lanes,
         disabled=disable_prints,
         desc="Creating intersections between proximal lanes",
@@ -262,7 +262,7 @@ def prune_intersecting_lanes(lanes: list[Lane], disable_prints: bool = False) ->
 
     lanes_to_remove = []
     for laneID, lane in enumerate(
-        tqdm(
+        wrap_with_tqdm(
             lanes,
             disabled=disable_prints,
             desc="Pruning Intersecting Lanes...",
