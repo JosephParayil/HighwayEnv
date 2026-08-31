@@ -1,3 +1,4 @@
+import warnings
 from itertools import chain
 from typing import cast
 
@@ -10,6 +11,7 @@ from highway_env.envs.common.observation import (
     NavigationObservation,
     observation_factory,
 )
+from highway_env.envs.common.warnings import HighwayEnvExperimentalWarning
 from highway_env.road.generation.engine.gen_utils import Lane
 from highway_env.road.generation.generator import generate_random_lanes
 from highway_env.road.generation.spatial_hash import (
@@ -43,6 +45,13 @@ class RandomRoadEnv(AbstractEnv):
         super().__init__(config=config, render_mode=render_mode)
         self.lanes = []
         self.vehicle_parked = False
+
+        # TODO: remove warning after environment is stable
+        warnings.warn(
+            HighwayEnvExperimentalWarning.template % self.__class__,
+            HighwayEnvExperimentalWarning,
+            stacklevel=2,
+        )
 
     @classmethod
     def default_config(cls) -> dict:
