@@ -327,7 +327,7 @@
             
             <section class="tex2jax_ignore mathjax_ignore" id="random-road">
 <span id="environments-random-road"></span><h1>Random Road<a class="headerlink" href="#random-road" title="Link to this heading">¶</a></h1>
-<p>Agent has low-level controls of a car and needs to navigate a procedurally generated road network to a goal parking spot.</p>
+<p>Agent has low-level controls of a car and needs to navigate a procedurally generated road network to a goal (parking spot).</p>
 <p>The rules are minimal:</p>
 <ol class="arabic simple">
 <li><p>Get to your destination in as little time as possible</p></li>
@@ -407,13 +407,13 @@ To do this, use <code class="docutils literal notranslate"><span class="pre">con
 <h2>Default configuration<a class="headerlink" href="#default-configuration" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
     <span class="s2">&quot;observation&quot;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;TupleObservation&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;observation_configs&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;LaneLidarObservation&quot;</span><span class="p">},</span>
-            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;NavigationObservation&quot;</span><span class="p">},</span>
-            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;RelativeGoalObservation&quot;</span><span class="p">},</span>
-            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;LidarObservation&quot;</span><span class="p">},</span>
-        <span class="p">],</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;DictObservation&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;observation_configs&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;lane_lidar&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;LaneLidarObservation&quot;</span><span class="p">},</span>
+            <span class="s2">&quot;navigation&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;NavigationObservation&quot;</span><span class="p">},</span>
+            <span class="s2">&quot;relative_goal&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;RelativeGoalObservation&quot;</span><span class="p">},</span>
+            <span class="s2">&quot;lidar&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;LidarObservation&quot;</span><span class="p">},</span>
+        <span class="p">},</span>
     <span class="p">},</span>
     <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ContinuousAction&quot;</span><span class="p">},</span>
     <span class="s2">&quot;screen_width&quot;</span><span class="p">:</span> <span class="mi">1200</span><span class="p">,</span>
@@ -478,7 +478,7 @@ Truncation will occur after a fixed number of timesteps.</p>
 <h2>API<a class="headerlink" href="#api" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="highway_env.envs.random_road_env.RandomRoadEnv">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">highway_env.envs.random_road_env.</span></span><span class="sig-name descname"><span class="pre">RandomRoadEnv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">render_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/highway_env/envs/random_road_env/#RandomRoadEnv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.random_road_env.RandomRoadEnv" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">highway_env.envs.random_road_env.</span></span><span class="sig-name descname"><span class="pre">RandomRoadEnv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">render_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/highway_env/envs/random_road_env/#RandomRoadEnv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.envs.random_road_env.RandomRoadEnv" title="Link to this definition">¶</a></dt>
 <dd><p>A navigation, negotiation, and parking environment
 set on a procedurally generated road network.</p>
 <p>The goal of an agent is to get to a parking spot
