@@ -813,7 +813,7 @@ class LaneLidarObservation(LidarObservation):
         **kwargs,
     ):
         super().__init__(env, cells, maximum_range, normalize, **kwargs)
-        self.heading = 0
+        self.vehicle_heading = 0
 
     def trace(self, origin: np.ndarray, origin_velocity: np.ndarray) -> np.ndarray:
         """
@@ -821,7 +821,7 @@ class LaneLidarObservation(LidarObservation):
         """
         self.origin = origin.copy()
 
-        self.heading = self.observer_vehicle.heading
+        self.vehicle_heading = self.observer_vehicle.heading
         self.grid = np.ones((self.cells, 2), dtype=np.float32) * self.maximum_range
 
         if not isinstance(self.env.road.network, PartitionedRoadNetwork):
@@ -831,7 +831,7 @@ class LaneLidarObservation(LidarObservation):
         gridsize = self.env.road.network.partition_gridsize
 
         for index in range(self.cells):
-            angle = index * self.angle + self.heading
+            angle = index * self.angle + self.vehicle_heading  # offset by vehicle dir
             vx = math.cos(angle)
             vy = math.sin(angle)
 
