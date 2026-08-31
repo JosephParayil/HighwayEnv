@@ -18,6 +18,7 @@ class AbstractLane:
     VEHICLE_LENGTH: float = 5
     length: float = 0
     line_types: list[LineType]
+    speed_limit: float | int
 
     @abstractmethod
     def position(self, longitudinal: float, lateral: float) -> np.ndarray:
