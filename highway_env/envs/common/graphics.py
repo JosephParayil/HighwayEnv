@@ -292,6 +292,7 @@ class ObservationGraphics:
 
     @classmethod
     def display_grid(cls, lidar_observation: LidarObservation, surface):
+        obs_origin = cast(NDArray, lidar_observation.origin)
         cells = lidar_observation.grid.shape[0]
         psi = np.repeat(
             -lidar_observation.angle / 2 + lidar_observation.angle * np.arange(cells),
