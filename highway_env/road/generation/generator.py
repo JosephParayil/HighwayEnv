@@ -179,7 +179,7 @@ def save_lanes_to_disk(filename: str, lanes: list[Lane]):
         data[f"lane_{i}_left"] = np.asarray(lane.left_points)
         data[f"lane_{i}_right"] = np.asarray(lane.right_points)
 
-    np.savez_compressed(filename, **data)
+    np.savez_compressed(filename, allow_pickle=True, **data)
 
 
 def load_lanes_from_disk(filename: str) -> list[Lane]:

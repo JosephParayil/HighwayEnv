@@ -79,6 +79,7 @@ style = [
     "pre-commit",
     "ruff",
     "ty",
+    "tqdm",
 ]
 dev = [
     { include-group = "test" },

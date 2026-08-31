@@ -85,7 +85,7 @@ def step_twist_gradient(
     :param r: length of imaginary appendage attached to the endpoint
     """
     if len(junction) <= 1:
-        return 0
+        return
 
     # Computing (x(a), y(a)) and theta(a)
     x_a, y_a = ep.position(lanes)
@@ -211,7 +211,7 @@ def rotate_optimize(lanes: list[Lane], n: int = 3) -> None:
     :param lanes: list of lanes
     :param n: number of actuators used in twist step (threshold for shortness)
     """
-    for laneID, lane in enumerate(lanes):
+    for lane_id, lane in enumerate(lanes):
         if len(lane.points) <= n:
             # Computing the desired start and end points of our lane
 
@@ -220,7 +220,7 @@ def rotate_optimize(lanes: list[Lane], n: int = 3) -> None:
                 start = get_junction_pos(
                     lanes,
                     start_junction,
-                    excluded_endpoint=Endpoint(id=laneID, loc="start"),
+                    excluded_endpoint=Endpoint(id=lane_id, loc="start"),
                 )
             else:
                 start = start_junction[0].position(lanes)
@@ -230,7 +230,7 @@ def rotate_optimize(lanes: list[Lane], n: int = 3) -> None:
                 end = get_junction_pos(
                     lanes,
                     end_junction,
-                    excluded_endpoint=Endpoint(id=laneID, loc="end"),
+                    excluded_endpoint=Endpoint(id=lane_id, loc="end"),
                 )
             else:
                 end = end_junction[0].position(lanes)

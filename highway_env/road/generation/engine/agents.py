@@ -259,8 +259,8 @@ class ConstructionAgent:
             proximal_lanes = get_proximal_lanes_wrt_gridpoint(
                 grid_to_lanes, gridpoint, extended=True
             )
-            for laneID in sorted(proximal_lanes):
-                lane = lanes[laneID]
+            for lane_id in sorted(proximal_lanes):
+                lane = lanes[lane_id]
                 for i, position in enumerate(lane.points):
                     dist = np.linalg.norm(position - self.position)
                     if dist < prevent_replication_radius:

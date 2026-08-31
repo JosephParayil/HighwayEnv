@@ -45,7 +45,7 @@ class RoadNetwork:
         (from _from to _to and from _to to _from)
         """
         self.add_lane(_from, _to, lane)
-        self.add_lane(_to, _from, lane)
+        self.add_lane(_to, _from, lane)  # pylint: disable=arguments-out-of-order
         self.reversed_lane_indices.add((_to, _from, len(self.graph[_to][_from]) - 1))
 
     def get_lane(self, index: LaneIndex) -> AbstractLane:
@@ -83,7 +83,7 @@ class RoadNetwork:
     def next_lane(
         self,
         current_index: LaneIndex,
-        route: Route = None,
+        route: Route | None = None,
         position: np.ndarray = None,
         np_random: np.random.RandomState = np.random,
     ) -> LaneIndex:

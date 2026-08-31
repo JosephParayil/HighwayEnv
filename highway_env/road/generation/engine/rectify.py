@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import cast
 
 import numpy as np
 
@@ -35,7 +36,7 @@ def rectify_map(
     )
     split_lanes(
         lanes,
-        conjoined_nodes,
+        cast(set[str], conjoined_nodes),
         merge_radius=merge_radius,
         forward_speed=forward_speed,
         disable_prints=disable_prints,
@@ -70,7 +71,7 @@ def combine_nodes(
     merge_radius: int = 20,
     mark: bool = False,
     disable_prints: bool = False,
-) -> None | list[str]:
+) -> None | set[str]:
     """
     Causes neighboring nodes to coalesce into the same logical
     intersection with the same identifier
@@ -101,11 +102,11 @@ def combine_nodes(
         # has propagated itself to other proximal nodes
         node_power = defaultdict(int)
 
-    for laneID, lane in enumerate(
+    for lane_id, lane in enumerate(
         wrap_with_tqdm(lanes, disabled=disable_prints, desc="Merging nodes")
     ):
         proximal_lanes = get_proximal_lanes_wrt_lane(
-            laneID, lane_to_grid, grid_to_lanes, extended=True
+            lane_id, lane_to_grid, grid_to_lanes, extended=True
         )
         for other_id in sorted(proximal_lanes):
             other_lane = lanes[other_id]
@@ -261,7 +262,7 @@ def prune_intersecting_lanes(lanes: list[Lane], disable_prints: bool = False) ->
     )
 
     lanes_to_remove = []
-    for laneID, lane in enumerate(
+    for lane_id, lane in enumerate(
         wrap_with_tqdm(
             lanes,
             disabled=disable_prints,
@@ -269,11 +270,11 @@ def prune_intersecting_lanes(lanes: list[Lane], disable_prints: bool = False) ->
         )
     ):
         proximal_lanes = get_proximal_lanes_wrt_lane(
-            laneID, lane_to_grid, grid_to_lanes
+            lane_id, lane_to_grid, grid_to_lanes
         )
         collision_detected = False
         for other_id in sorted(proximal_lanes):
-            if laneID < other_id:
+            if lane_id < other_id:
                 other_lane = lanes[other_id]
                 pairs = zip(lane.points, lane.points[1:])
                 for p0, p1 in pairs:

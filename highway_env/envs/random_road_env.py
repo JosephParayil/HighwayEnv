@@ -271,14 +271,14 @@ class RandomRoadEnv(AbstractEnv):
         """
         assert self.road is not None
         curb_spot_offset = 0.1
-        # segment_index: {laneID, side, pt_id (1-(len-2))}
+        # segment_index: {lane_id, side, pt_id (1-(len-2))}
         segment_indices = []
 
         for lane_id, lane in enumerate(self.lanes):
             for side in ["left_points", "right_points"]:
                 for pt_id in range(1, len(getattr(lane, side)) - 2):
                     segment_indices.append(
-                        {"laneID": lane_id, "side": side, "pt_id": pt_id}
+                        {"lane_id": lane_id, "side": side, "pt_id": pt_id}
                     )
 
         rng.shuffle(segment_indices)
@@ -289,7 +289,7 @@ class RandomRoadEnv(AbstractEnv):
             segment_indices
         ):
             segment_index = segment_indices[segment_indices_i]
-            lane_id = cast(int, segment_index["laneID"])
+            lane_id = cast(int, segment_index["lane_id"])
             side = cast(str, segment_index["side"])
             pt_id = cast(int, segment_index["pt_id"])
 

@@ -5,12 +5,6 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 
-try:
-    from tqdm import tqdm as _tqdm
-except ImportError:
-    _tqdm = None
-
-
 # Lane Graph Helpers ----------------------------------------
 
 
@@ -196,7 +190,7 @@ def line_intersection_t(
     A + t_a*A_v = B + t_b*B_v
     """
     A = np.column_stack((av, -bv))
-    B = b - a
+    B = np.asarray(b) - np.asarray(a)
 
     try:
         t_a, t_b = np.linalg.solve(A, B)
@@ -257,8 +251,13 @@ def wrap_with_tqdm(iterable=None, disabled=False, *args, **kwargs):
     :param disabled: if True, skip the progress bar even when tqdm is installed
     :return: a tqdm progress bar, the original iterable, or a dummy pbar
     """
-    if _tqdm is not None and not disabled:
-        return _tqdm(iterable, *args, **kwargs)
+    if not disabled:
+        try:
+            from tqdm import tqdm
+
+            return tqdm(iterable, *args, **kwargs)
+        except ImportError:
+            pass
     if iterable is not None:
         return iterable
     return _DummyPbar()
@@ -268,7 +267,7 @@ class _DummyPbar:
     def __init__(self, *args, **kwargs):
         self.n = 0
 
-    def update(self, n: int | float | None = 1):
+    def update(self, n: int | float = 1):
         self.n += n
 
     def refresh(self):

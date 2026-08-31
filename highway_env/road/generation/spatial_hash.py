@@ -1,6 +1,6 @@
 from collections import defaultdict
 from itertools import chain
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -21,7 +21,7 @@ def point_to_gridpoint(point: np.ndarray, gridsize: int) -> tuple[int, int]:
 
 def lanes_spatial_hash(
     lanes: list[Lane], gridsize: int = 100, use_boundaries: bool = True
-) -> tuple[defaultdict[set], defaultdict[set]]:
+) -> tuple[defaultdict[Any, set], defaultdict[Any, set]]:
     """
     Partitions lanes into separate grids for significantly
     faster proximal checks.
@@ -38,7 +38,7 @@ def lanes_spatial_hash(
     lane_to_grid = defaultdict(set)
     grid_to_lanes = defaultdict(set)
 
-    for laneID, lane in enumerate(lanes):
+    for lane_id, lane in enumerate(lanes):
         if use_boundaries:
             pts = chain(lane.left_points, lane.right_points)
         else:
@@ -47,8 +47,8 @@ def lanes_spatial_hash(
         last_gridpoint = None
         for point in pts:
             gridpoint = point_to_gridpoint(point, gridsize)
-            lane_to_grid[laneID].add(gridpoint)
-            grid_to_lanes[gridpoint].add(laneID)
+            lane_to_grid[lane_id].add(gridpoint)
+            grid_to_lanes[gridpoint].add(lane_id)
 
             # In the case that we traverse precisely diagonally,
             # skipping over a grid:
@@ -59,9 +59,9 @@ def lanes_spatial_hash(
             ):
                 gp1 = (gridpoint[0], last_gridpoint[1])
                 gp2 = (last_gridpoint[0], gridpoint[1])
-                lane_to_grid[laneID].update((gp1, gp2))
-                grid_to_lanes[gp1].add(laneID)
-                grid_to_lanes[gp2].add(laneID)
+                lane_to_grid[lane_id].update((gp1, gp2))
+                grid_to_lanes[gp1].add(lane_id)
+                grid_to_lanes[gp2].add(lane_id)
             last_gridpoint = gridpoint
 
     return lane_to_grid, grid_to_lanes
@@ -81,7 +81,9 @@ gridhash_offsets = [
 
 
 def get_proximal_lanes_wrt_gridpoint(
-    grid_to_lanes: defaultdict[set], gridpoint: Sequence[int], extended: bool = False
+    grid_to_lanes: defaultdict[Any, set],
+    gridpoint: Sequence[int],
+    extended: bool = False,
 ) -> set:
     """
     :param grid_to_lanes: map from gridpoints to the indices of lanes that inhabit them
@@ -98,26 +100,26 @@ def get_proximal_lanes_wrt_gridpoint(
 
 
 def get_proximal_lanes_wrt_lane(
-    laneID: int,
-    lane_to_grid: defaultdict[set],
-    grid_to_lanes: defaultdict[set],
+    lane_id: int,
+    lane_to_grid: defaultdict[Any, set],
+    grid_to_lanes: defaultdict[Any, set],
     extended: bool = False,
 ) -> set:
     """
-    :param laneID: index of reference lane
+    :param lane_id: index of reference lane
     :param lane_to_grid: map from lanes to the gridpoints they occupy
     :param grid_to_lanes: map from gridpoints to the lanes that inhabit them
     :param extended: whether or not to count lanes in neighboring grids
     :return: set of proximal lane indices
     """
     proximal_lanes = set()
-    for gridpoint in lane_to_grid[laneID]:
+    for gridpoint in lane_to_grid[lane_id]:
         proximal_lanes.update(
             get_proximal_lanes_wrt_gridpoint(
                 grid_to_lanes, gridpoint, extended=extended
             )
         )
 
-    proximal_lanes.discard(laneID)
+    proximal_lanes.discard(lane_id)
 
     return proximal_lanes

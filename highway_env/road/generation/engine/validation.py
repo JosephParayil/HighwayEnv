@@ -1,8 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import chain
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ..spatial_hash import (
     get_proximal_lanes_wrt_gridpoint,
@@ -86,7 +88,7 @@ def determine_lane_validity(
     lane: Lane,
     start_pt: np.ndarray,
     end_pt: np.ndarray,
-    grid_to_lanes: defaultdict[set],
+    grid_to_lanes: defaultdict[Any, set],
     gridsize: int,
     forward_speed: int,
     rng: np.random.Generator,
@@ -116,15 +118,13 @@ def determine_lane_validity(
     if np.array_equal(pathway[-1], pathway[-2]):
         pathway.pop()
 
-    """
-    FORCES:
-    - Pulling force: leads ball along pathway to end_pt
-    - Wall repelling force: pushes ball from proximal line barriers
-    - Ball repelling force: pushes ball from other balls to encourage
-        exploration
-    - Inelastic line barrier collisions
-    - Friction / drag
-    """
+    # FORCES:
+    # - Pulling force: leads ball along pathway to end_pt
+    # - Wall repelling force: pushes ball from proximal line barriers
+    # - Ball repelling force: pushes ball from other balls to encourage
+    #     exploration
+    # - Inelastic line barrier collisions
+    # - Friction / drag
 
     ball_radius = 2  # CONSTRAINT: 2*ball_radius >= vehicle width
     pull_force = 0.3 / 4  # CONSTRAINT: pull_force <= ball_radius * friction
@@ -252,8 +252,8 @@ class BallParticle:
         """
         repel_vector = np.zeros(2)
 
-        for other_laneID in sorted(proximal_lanes):
-            other_lane = lanes[other_laneID]
+        for other_lane_id in sorted(proximal_lanes):
+            other_lane = lanes[other_lane_id]
 
             left_pairs = zip(other_lane.left_points, other_lane.left_points[1:])
             right_pairs = zip(other_lane.right_points, other_lane.right_points[1:])
@@ -349,19 +349,19 @@ def kill_lanes(lanes: list[Lane], lanes_to_kil: list[Lane]) -> None:
     # Accounting for which intersections are getting affected by lane removal
     # and the line sgements of the holes being left behind
     affected_nodes = defaultdict(list)
-    for laneID in lane_ids_to_kil:
+    for lane_id in lane_ids_to_kil:
         for loc in ["start", "end"]:
-            node = getattr(lanes[laneID], loc)
+            node = getattr(lanes[lane_id], loc)
             if len(get_radially_sorted_endpoints(lanes, node)) > 1:
                 affected_nodes[node].append(
                     (
-                        lanes[laneID].left_points[Endpoint.l_to_i[loc]],
-                        lanes[laneID].right_points[Endpoint.l_to_i[loc]],
+                        lanes[lane_id].left_points[Endpoint.l_to_i[loc]],
+                        lanes[lane_id].right_points[Endpoint.l_to_i[loc]],
                     )
                 )
 
-    for laneID in lane_ids_to_kil:
-        del lanes[laneID]
+    for lane_id in lane_ids_to_kil:
+        del lanes[lane_id]
 
     # Repairing left behind holes
     for node, segments in affected_nodes.items():
@@ -399,6 +399,7 @@ def kill_lanes(lanes: list[Lane], lanes_to_kil: list[Lane]) -> None:
                         closest_dist = min(dist0, dist1)
                         first_point_is_s0 = dist0 < dist1
 
+            assert closest_ep is not None and closest_side is not None
             if closest_ep.loc == "start":
                 getattr(lanes[closest_ep.id], closest_side).insert(
                     0, segment[1] if first_point_is_s0 else segment[0]
@@ -407,8 +408,6 @@ def kill_lanes(lanes: list[Lane], lanes_to_kil: list[Lane]) -> None:
                 getattr(lanes[closest_ep.id], closest_side).append(
                     segment[1] if first_point_is_s0 else segment[0]
                 )
-
-    return affected_nodes
 
 
 def remove_disjoint_clusters(lanes: list[Lane]) -> None:
@@ -434,12 +433,12 @@ def remove_disjoint_clusters(lanes: list[Lane]) -> None:
     # We must remove all lanes who does not connect to
     # a node in this nodeset.
     lane_ids_to_remove = []
-    for laneID, lane in enumerate(lanes):
+    for lane_id, lane in enumerate(lanes):
         if lane.start not in nodeset:
-            lane_ids_to_remove.append(laneID)
+            lane_ids_to_remove.append(lane_id)
 
-    for laneID in reversed(lane_ids_to_remove):
-        lanes.pop(laneID)
+    for lane_id in reversed(lane_ids_to_remove):
+        lanes.pop(lane_id)
 
 
 def traverse_lane_graph(lanes: list[Lane], node: str) -> set[str]:
@@ -454,19 +453,19 @@ def traverse_lane_graph(lanes: list[Lane], node: str) -> set[str]:
     prev_laneset_size = -1
     while len(laneset) != prev_laneset_size:
         prev_laneset_size = len(laneset)
-        for laneID, lane in enumerate(lanes):
+        for lane_id, lane in enumerate(lanes):
             if lane.start in nodeset or lane.end in nodeset:
                 nodeset.add(lane.start)
                 nodeset.add(lane.end)
-                laneset.add(laneID)
+                laneset.add(lane_id)
 
     return nodeset
 
 
 def get_all_intersection_points(
     lanes: list[Lane],
-    lane_to_grid: defaultdict[set],
-    grid_to_lanes: defaultdict[set],
+    lane_to_grid: defaultdict[Any, set],
+    grid_to_lanes: defaultdict[Any, set],
     disable_prints: bool = False,
 ) -> list[np.ndarray]:
     """
@@ -479,15 +478,17 @@ def get_all_intersection_points(
     :param disable_prints: disables progress and status printing
     :return: list of intersection points
     """
-    intersecting_points = []
-    for laneID, lane in enumerate(
-        wrap_with_tqdm(lanes, disabled=disable_prints, desc="Flagging intersection points")
+    intersecting_points: list[NDArray] = []
+    for lane_id, lane in enumerate(
+        wrap_with_tqdm(
+            lanes, disabled=disable_prints, desc="Flagging intersection points"
+        )
     ):
         proximal_lanes = get_proximal_lanes_wrt_lane(
-            laneID, lane_to_grid, grid_to_lanes
+            lane_id, lane_to_grid, grid_to_lanes
         )
         for other_id in proximal_lanes:
-            if laneID >= other_id:
+            if lane_id >= other_id:
                 continue
             other_lane = lanes[other_id]
             left_pairs = zip(lane.left_points, lane.left_points[1:])
@@ -503,7 +504,9 @@ def get_all_intersection_points(
                     t_a, t_b = line_intersection_t(p0, p1 - p0, op0, op1 - op0)
                     if t_a > 0.01 and t_a < 0.99 and t_b > 0.01 and t_b < 0.99:
                         intersecting_points.append(
-                            find_line_intersection(p0, p1 - p0, op0, op1 - op0)
+                            np.asarray(
+                                find_line_intersection(p0, p1 - p0, op0, op1 - op0)
+                            )
                         )
 
     return intersecting_points

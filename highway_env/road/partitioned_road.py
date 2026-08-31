@@ -1,5 +1,6 @@
 from collections import defaultdict
 from itertools import chain
+from typing import Any
 
 import numpy as np
 
@@ -12,7 +13,7 @@ from highway_env.road.road import LaneIndex, RoadNetwork
 
 
 class PartitionedRoadNetwork(RoadNetwork):
-    grid_to_lanes: defaultdict[set]
+    grid_to_lanes: defaultdict[Any, set]
     partition_gridsize: int
 
     def __init__(self, partition_gridsize=100):
